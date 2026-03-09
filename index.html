@@ -135,70 +135,115 @@
 
         /* ===== CIRCLE ===== */
         .circle-wrap {
+            display: -webkit-flex;
             display: flex;
+            -webkit-flex-direction: column;
             flex-direction: column;
+            -webkit-align-items: center;
             align-items: center;
             margin-bottom: 36px;
         }
 
+        /* Ripple container — fixed size, centered */
         .circle-outer {
             position: relative;
             width: 220px;
             height: 220px;
             cursor: pointer;
             margin-bottom: 24px;
+            /* GPU layer for smooth Android rendering */
+            -webkit-transform: translateZ(0);
+            transform: translateZ(0);
         }
 
-        /* Ripple rings */
+        /* Ripple rings — use top/left/right/bottom instead of inset */
         .ripple {
             position: absolute;
-            inset: -20px;
+            top: -20px; left: -20px; right: -20px; bottom: -20px;
             border-radius: 50%;
             border: 1px solid rgba(142,184,164,0.12);
+            -webkit-animation: ripple-idle 4s ease-in-out infinite;
             animation: ripple-idle 4s ease-in-out infinite;
             pointer-events: none;
+            -webkit-transform: translateZ(0);
+            transform: translateZ(0);
         }
-        .ripple:nth-child(2) { inset: -36px; border-color: rgba(142,184,164,0.06); animation-delay: -1.3s; }
-        .ripple:nth-child(3) { inset: -52px; border-color: rgba(142,184,164,0.03); animation-delay: -2.6s; }
+        .ripple:nth-child(2) {
+            top: -36px; left: -36px; right: -36px; bottom: -36px;
+            border-color: rgba(142,184,164,0.06);
+            -webkit-animation-delay: -1.3s;
+            animation-delay: -1.3s;
+        }
+        .ripple:nth-child(3) {
+            top: -52px; left: -52px; right: -52px; bottom: -52px;
+            border-color: rgba(142,184,164,0.03);
+            -webkit-animation-delay: -2.6s;
+            animation-delay: -2.6s;
+        }
 
+        @-webkit-keyframes ripple-idle {
+            0%, 100% { -webkit-transform: scale(1) translateZ(0); opacity: 0.6; }
+            50%       { -webkit-transform: scale(1.04) translateZ(0); opacity: 1; }
+        }
         @keyframes ripple-idle {
-            0%, 100% { transform: scale(1); opacity: 0.6; }
-            50%       { transform: scale(1.04); opacity: 1; }
+            0%, 100% { transform: scale(1) translateZ(0); opacity: 0.6; }
+            50%       { transform: scale(1.04) translateZ(0); opacity: 1; }
         }
 
+        /* Circle — use top/left/width/height instead of inset */
         .circle {
             position: absolute;
-            inset: 0;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
             border-radius: 50%;
             background: radial-gradient(circle at 40% 35%, #1e2a24, #111518);
             border: 1px solid rgba(142,184,164,0.18);
             box-shadow:
                 0 0 40px rgba(142,184,164,0.08),
-                0 20px 60px rgba(0,0,0,0.5),
-                inset 0 1px 0 rgba(255,255,255,0.06);
+                0 20px 60px rgba(0,0,0,0.5);
+            display: -webkit-flex;
             display: flex;
+            -webkit-flex-direction: column;
             flex-direction: column;
+            -webkit-align-items: center;
             align-items: center;
+            -webkit-justify-content: center;
             justify-content: center;
             gap: 4px;
+            /* Force GPU compositing on Android */
+            -webkit-transform: scale(1) translateZ(0);
+            transform: scale(1) translateZ(0);
+            will-change: transform;
+            -webkit-transition: box-shadow 0.5s ease;
             transition: box-shadow 0.5s ease;
         }
-        .circle:hover {
-            box-shadow:
-                0 0 60px rgba(142,184,164,0.14),
-                0 20px 60px rgba(0,0,0,0.5),
-                inset 0 1px 0 rgba(255,255,255,0.08);
-        }
 
+        /* Android: use JS-driven animation class with explicit duration set via style */
         .circle.active-inspire {
-            animation: circle-expand var(--phase-dur, 5s) ease-in-out forwards;
-            box-shadow: 0 0 80px rgba(142,184,164,0.2), 0 20px 60px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06);
+            -webkit-animation: circle-expand 5s ease-in-out forwards;
+            animation: circle-expand 5s ease-in-out forwards;
         }
         .circle.active-expire {
-            animation: circle-contract var(--phase-dur, 5s) ease-in-out forwards;
+            -webkit-animation: circle-contract 5s ease-in-out forwards;
+            animation: circle-contract 5s ease-in-out forwards;
         }
-        @keyframes circle-expand   { 0% { transform: scale(1); } 100% { transform: scale(1.22); } }
-        @keyframes circle-contract { 0% { transform: scale(1.22); } 100% { transform: scale(1); } }
+
+        @-webkit-keyframes circle-expand {
+            0%   { -webkit-transform: scale(1) translateZ(0); }
+            100% { -webkit-transform: scale(1.2) translateZ(0); }
+        }
+        @keyframes circle-expand {
+            0%   { transform: scale(1) translateZ(0); }
+            100% { transform: scale(1.2) translateZ(0); }
+        }
+        @-webkit-keyframes circle-contract {
+            0%   { -webkit-transform: scale(1.2) translateZ(0); }
+            100% { -webkit-transform: scale(1) translateZ(0); }
+        }
+        @keyframes circle-contract {
+            0%   { transform: scale(1.2) translateZ(0); }
+            100% { transform: scale(1) translateZ(0); }
+        }
 
         .circle-phase {
             font-family: var(--font-serif);
@@ -212,6 +257,7 @@
             font-weight: 300;
             color: var(--accent);
             line-height: 1;
+            font-feature-settings: "tnum";
             font-variant-numeric: tabular-nums;
         }
 
@@ -954,11 +1000,27 @@ async function runPhase(phase, dur) {
     const phaseEl = document.getElementById('phaseText');
     const countEl = document.getElementById('timerDisplay');
 
+    // Reset — force reflow before re-adding class (Android needs this)
     circle.className = 'circle';
-    void circle.offsetWidth;
-    circle.style.setProperty('--phase-dur', dur + 's');
-    if (phase === 'inspire') circle.classList.add('active-inspire');
-    else if (phase === 'expire') circle.classList.add('active-expire');
+    circle.style.webkitAnimationName = 'none';
+    circle.style.animationName = 'none';
+    // eslint-disable-next-line no-unused-expressions
+    circle.offsetWidth; // trigger reflow
+
+    // Set duration directly on the element (more reliable than CSS vars on Android WebView)
+    const durStr = dur + 's';
+    circle.style.webkitAnimationDuration = durStr;
+    circle.style.animationDuration       = durStr;
+    circle.style.webkitAnimationName     = '';
+    circle.style.animationName           = '';
+
+    if (phase === 'inspire')      circle.classList.add('active-inspire');
+    else if (phase === 'expire')  circle.classList.add('active-expire');
+    else {
+        // hold phases — subtle pulse
+        circle.style.webkitTransform = phase === 'hold_inspire' ? 'scale(1.2) translateZ(0)' : 'scale(1) translateZ(0)';
+        circle.style.transform       = phase === 'hold_inspire' ? 'scale(1.2) translateZ(0)' : 'scale(1) translateZ(0)';
+    }
 
     phaseEl.textContent = phaseNames[phase];
     playTone(phase);
@@ -996,12 +1058,17 @@ function stopBreathing() {
     clearInterval(sessionInterval);
     document.getElementById('startBtn').disabled = false;
     document.getElementById('stopBtn').disabled  = true;
-    document.getElementById('phaseText').textContent  = 'Toucher';
+    document.getElementById('phaseText').textContent   = 'Toucher';
     document.getElementById('timerDisplay').textContent = '–';
     document.getElementById('sessionTimer').textContent = '00:00';
     const c = document.getElementById('circle');
     c.className = 'circle';
-    c.style.removeProperty('--phase-dur');
+    c.style.webkitAnimationName     = '';
+    c.style.animationName           = '';
+    c.style.webkitAnimationDuration = '';
+    c.style.animationDuration       = '';
+    c.style.webkitTransform         = 'scale(1) translateZ(0)';
+    c.style.transform               = 'scale(1) translateZ(0)';
     sessionStartTime = null;
 }
 
