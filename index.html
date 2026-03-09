@@ -961,26 +961,36 @@
 </div>
 
 <script>
-// ==================== STATE ====================
-let audioCtx = null;
-let isRunning = false;
-let timerInterval = null;
-let sessionStartTime = null;
-let sessionInterval = null;
-let targetDurationSec = 0;
-let selectedMood = null;
-let volume = 0.5;
-let ambientType   = 'silence';
-let ambientVolume = 0.4;
-let ambientNodes  = [];
-let ambientGain   = null;
+/* ================================================================
+   SOUFFLE — JS ES5 strict (compatible Android 8 / Samsung S8 WebView)
+   Aucun : let, const, =>, async/await, template literal, destructuring
+   ================================================================ */
 
-let stats = { sessions:[], totalSessions:0, totalMinutes:0, streak:0, lastSessionDate:null };
+// ===== STATE =====
+var audioCtx        = null;
+var isRunning       = false;
+var timerInterval   = null;
+var sessionStartTime= null;
+var sessionInterval = null;
+var targetDurationSec = 0;
+var selectedMood    = null;
+var volume          = 0.5;
+var ambientType     = 'silence';
+var ambientVolume   = 0.4;
+var ambientNodes    = [];
+var ambientGain     = null;
+var audioUnlocked   = false;
+var phaseRunning    = false;
+var phaseResolve    = null;
 
-// ==================== DATA ====================
+var stats = { sessions:[], totalSessions:0, totalMinutes:0, streak:0, lastSessionDate:null };
+
+var phaseNames = { inspire:'Inspiration', hold_inspire:'Retenue', expire:'Expiration', hold_expire:'Retenue' };
+
+// ===== DATA =====
 function loadData() {
     try {
-        const s = localStorage.getItem('souffleData');
+        var s = localStorage.getItem('souffleData');
         if (s) stats = JSON.parse(s);
         if (localStorage.getItem('theme') === 'light') applyLight();
         if (localStorage.getItem('largeText') === 'true') {
@@ -996,59 +1006,53 @@ function saveData() {
     try { localStorage.setItem('souffleData', JSON.stringify(stats)); } catch(e) {}
 }
 
-// ==================== SLIDERS ====================
-function updateValues(el) {
-    const ids = ['inspireTime','holdInspireTime','expireTime','holdExpireTime','targetDuration'];
-    const labels = ['inspireValue','holdInspireValue','expireValue','holdExpireValue','targetDurationValue'];
-    const units  = ['s','s','s','s',' min'];
-    ids.forEach((id, i) => {
-        const input = document.getElementById(id);
-        const val = parseInt(input.value);
-        const max = parseInt(input.max);
-        const min = parseInt(input.min);
-        const pct = ((val - min) / (max - min)) * 100;
-        input.style.setProperty('--pct', pct + '%');
-        document.getElementById(labels[i]).textContent = val + units[i];
-    });
-}
+// ===== SLIDERS =====
+var sliderIds    = ['inspireTime','holdInspireTime','expireTime','holdExpireTime','targetDuration'];
+var sliderLabels = ['inspireValue','holdInspireValue','expireValue','holdExpireValue','targetDurationValue'];
+var sliderUnits  = ['s','s','s','s',' min'];
 
-function initSliders() {
-    const ids = ['inspireTime','holdInspireTime','expireTime','holdExpireTime','targetDuration'];
-    ids.forEach(id => {
-        const input = document.getElementById(id);
-        const val = parseInt(input.value);
-        const max = parseInt(input.max);
-        const min = parseInt(input.min);
-        const pct = ((val - min) / (max - min)) * 100;
+function updateValues() {
+    for (var i = 0; i < sliderIds.length; i++) {
+        var input = document.getElementById(sliderIds[i]);
+        var val = parseInt(input.value, 10);
+        var max = parseInt(input.max, 10);
+        var min = parseInt(input.min, 10);
+        var pct = ((val - min) / (max - min)) * 100;
         input.style.setProperty('--pct', pct + '%');
-    });
+        document.getElementById(sliderLabels[i]).textContent = val + sliderUnits[i];
+    }
 }
+function initSliders() { updateValues(); }
 
-// ==================== PRESETS ====================
+// ===== PRESETS =====
+var PRESETS = {
+    coherence:    [5,  0,  5,  0],
+    relax:        [4,  0,  7,  8],
+    box:          [4,  4,  4,  4],
+    calm:         [6,  2,  4,  0],
+    energy:       [3,  0,  3,  0],
+    miniyogi:     [5,  0, 20,  0],
+    megayogi:     [5,  0, 25,  0],
+    megagigayogi: [5,  0, 30,  0]
+};
 function loadPreset(name, el) {
-    document.querySelectorAll('.preset-chip').forEach(function(b){ b.classList.remove('active'); });
+    var chips = document.querySelectorAll('.preset-chip');
+    for (var i = 0; i < chips.length; i++) chips[i].classList.remove('active');
     if (el && el.classList) el.classList.add('active');
-    const P = {
-        coherence:    [5,  0,  5,  0],
-        relax:        [4,  0,  7,  8],
-        box:          [4,  4,  4,  4],
-        calm:         [6,  2,  4,  0],
-        energy:       [3,  0,  3,  0],
-        miniyogi:     [5,  0, 20,  0],
-        megayogi:     [5,  0, 25,  0],
-        megagigayogi: [5,  0, 30,  0]
-    };
-    const [ins, hIns, exp, hExp] = P[name];
-    document.getElementById('inspireTime').value     = ins;
-    document.getElementById('holdInspireTime').value = hIns;
-    document.getElementById('expireTime').value      = exp;
-    document.getElementById('holdExpireTime').value  = hExp;
+    var p = PRESETS[name];
+    if (!p) return;
+    document.getElementById('inspireTime').value     = p[0];
+    document.getElementById('holdInspireTime').value = p[1];
+    document.getElementById('expireTime').value      = p[2];
+    document.getElementById('holdExpireTime').value  = p[3];
     updateValues();
 }
 
-// ==================== AUDIO ====================
+// ===== AUDIO BIPS =====
 function initAudio() {
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    } catch(e) {}
 }
 function updateVolume() {
     volume = document.getElementById('volumeSlider').value / 100;
@@ -1056,88 +1060,93 @@ function updateVolume() {
 }
 function playTone(phase) {
     if (!document.getElementById('soundToggle').checked) return;
-    initAudio();
-    const osc  = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    osc.connect(gain); gain.connect(audioCtx.destination);
-    const f = { inspire:432, hold_inspire:528, expire:384, hold_expire:336, finish:528 };
-    osc.frequency.value = f[phase] || 432;
-    osc.type = 'sine';
-    gain.gain.setValueAtTime(volume * 0.25, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.8);
-    osc.start(); osc.stop(audioCtx.currentTime + 0.8);
+    try {
+        initAudio();
+        var osc  = audioCtx.createOscillator();
+        var gain = audioCtx.createGain();
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        var freqs = { inspire:432, hold_inspire:528, expire:384, hold_expire:336, finish:528 };
+        osc.frequency.value = freqs[phase] || 432;
+        osc.type = 'sine';
+        gain.gain.setValueAtTime(volume * 0.25, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.8);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.8);
+    } catch(e) {}
 }
 function doVibrate(p) {
-    if (document.getElementById('vibrateToggle').checked && navigator.vibrate) navigator.vibrate(p);
+    try {
+        if (document.getElementById('vibrateToggle').checked && navigator.vibrate) navigator.vibrate(p);
+    } catch(e) {}
 }
 
-// ==================== AMBIENT SOUND ENGINE ====================
-
+// ===== AMBIENT SOUND ENGINE =====
 function updateAmbVolume() {
     ambientVolume = document.getElementById('ambVolumeSlider').value / 100;
     document.getElementById('ambVolumeValue').textContent = document.getElementById('ambVolumeSlider').value + '%';
-    if (ambientGain) ambientGain.gain.setTargetAtTime(ambientVolume, audioCtx.currentTime, 0.1);
+    if (ambientGain && audioCtx) ambientGain.gain.setTargetAtTime(ambientVolume, audioCtx.currentTime, 0.1);
 }
-
 function selectAmbient(type, el) {
     ambientType = type;
-    document.querySelectorAll('.ambient-btn').forEach(function(b){ b.classList.remove('active'); });
+    var btns = document.querySelectorAll('.ambient-btn');
+    for (var i = 0; i < btns.length; i++) btns[i].classList.remove('active');
     document.getElementById('amb-' + type).classList.add('active');
-    const volRow = document.getElementById('ambVolRow');
-    volRow.classList.toggle('hidden', type === 'silence');
+    var volRow = document.getElementById('ambVolRow');
+    if (type === 'silence') volRow.classList.add('hidden');
+    else volRow.classList.remove('hidden');
     if (isRunning) { stopAmbient(); if (type !== 'silence') startAmbient(); }
 }
-
 function startAmbient() {
     if (ambientType === 'silence') return;
-    initAudio();
-    stopAmbient();
-    ambientGain = audioCtx.createGain();
-    ambientGain.gain.setValueAtTime(0, audioCtx.currentTime);
-    ambientGain.gain.linearRampToValueAtTime(ambientVolume, audioCtx.currentTime + 2);
-    ambientGain.connect(audioCtx.destination);
-    ambientNodes = [];
-
-    const builders = {
-        waves:  buildWaves,
-        rain:   buildRain,
-        forest: buildForest,
-        wind:   buildWind,
-        bowls:  buildBowls,
-    };
-    if (builders[ambientType]) builders[ambientType](ambientGain);
+    try {
+        initAudio();
+        stopAmbient();
+        ambientGain = audioCtx.createGain();
+        ambientGain.gain.setValueAtTime(0, audioCtx.currentTime);
+        ambientGain.gain.linearRampToValueAtTime(ambientVolume, audioCtx.currentTime + 2);
+        ambientGain.connect(audioCtx.destination);
+        ambientNodes = [];
+        if (ambientType === 'waves')  buildWaves(ambientGain);
+        else if (ambientType === 'rain')   buildRain(ambientGain);
+        else if (ambientType === 'forest') buildForest(ambientGain);
+        else if (ambientType === 'wind')   buildWind(ambientGain);
+        else if (ambientType === 'bowls')  buildBowls(ambientGain);
+    } catch(e) {}
 }
-
 function stopAmbient() {
-    if (ambientGain) {
-        ambientGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.5);
-        const g = ambientGain;
-        setTimeout(() => { try { g.disconnect(); } catch(e){} }, 1500);
-        ambientGain = null;
-    }
-    ambientNodes.forEach(n => { try { n.stop(); n.disconnect(); } catch(e){} });
-    ambientNodes = [];
+    try {
+        if (ambientGain && audioCtx) {
+            ambientGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.5);
+            var g = ambientGain;
+            setTimeout(function() { try { g.disconnect(); } catch(e2){} }, 1500);
+            ambientGain = null;
+        }
+        for (var i = 0; i < ambientNodes.length; i++) {
+            try { ambientNodes[i].stop(); ambientNodes[i].disconnect(); } catch(e) {}
+        }
+        ambientNodes = [];
+    } catch(e) {}
 }
 
-// --- White / Brown / Pink noise buffer helper ---
+// --- Noise buffer ---
 function makeNoiseBuffer(type, seconds) {
-    const sr     = audioCtx.sampleRate;
-    const frames = sr * seconds;
-    const buf    = audioCtx.createBuffer(1, frames, sr);
-    const data   = buf.getChannelData(0);
+    var sr     = audioCtx.sampleRate;
+    var frames = sr * seconds;
+    var buf    = audioCtx.createBuffer(1, frames, sr);
+    var data   = buf.getChannelData(0);
+    var i, w, last;
     if (type === 'white') {
-        for (let i = 0; i < frames; i++) data[i] = Math.random() * 2 - 1;
+        for (i = 0; i < frames; i++) data[i] = Math.random() * 2 - 1;
     } else if (type === 'brown') {
-        let last = 0;
-        for (let i = 0; i < frames; i++) {
-            const w = Math.random() * 2 - 1;
+        last = 0;
+        for (i = 0; i < frames; i++) {
+            w = Math.random() * 2 - 1;
             data[i] = (last + 0.02 * w) / 1.02;
             last = data[i]; data[i] *= 3.5;
         }
     } else if (type === 'pink') {
-        let b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=0;
-        for (let i = 0; i < frames; i++) {
-            const w = Math.random() * 2 - 1;
+        var b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=0;
+        for (i = 0; i < frames; i++) {
+            w = Math.random() * 2 - 1;
             b0=0.99886*b0+w*0.0555179; b1=0.99332*b1+w*0.0750759;
             b2=0.96900*b2+w*0.1538520; b3=0.86650*b3+w*0.3104856;
             b4=0.55000*b4+w*0.5329522; b5=-0.7616*b5-w*0.0168980;
@@ -1147,449 +1156,434 @@ function makeNoiseBuffer(type, seconds) {
     }
     return buf;
 }
-
-function loopNoise(type, dest, filter) {
-    const buf = makeNoiseBuffer(type, 4);
-    const src = audioCtx.createBufferSource();
+function loopNoise(type, dest) {
+    var buf = makeNoiseBuffer(type, 4);
+    var src = audioCtx.createBufferSource();
     src.buffer = buf; src.loop = true;
-    if (filter) { src.connect(filter); filter.connect(dest); }
-    else src.connect(dest);
+    src.connect(dest);
     src.start();
     ambientNodes.push(src);
     return src;
 }
 
-// 🌊 WAVES
+// Waves
 function buildWaves(dest) {
-    // layered brown noise with slow LFO volume modulation
-    for (let i = 0; i < 3; i++) {
-        const lpf = audioCtx.createBiquadFilter();
-        lpf.type = 'lowpass'; lpf.frequency.value = 600 + i * 200;
-        const waveGain = audioCtx.createGain();
-        waveGain.gain.value = 0.3 + i * 0.05;
-        lpf.connect(waveGain); waveGain.connect(dest);
-
-        const lfo = audioCtx.createOscillator();
-        const lfoGain = audioCtx.createGain();
-        lfo.frequency.value = 0.12 + i * 0.04; // ~8-12 sec wave cycle
-        lfoGain.gain.value = 0.28;
-        lfo.connect(lfoGain); lfoGain.connect(waveGain.gain);
-        lfo.start(); ambientNodes.push(lfo);
-
-        loopNoise('brown', lpf);
+    var i;
+    for (i = 0; i < 3; i++) {
+        (function(idx) {
+            var lpf = audioCtx.createBiquadFilter();
+            lpf.type = 'lowpass'; lpf.frequency.value = 600 + idx * 200;
+            var wg = audioCtx.createGain(); wg.gain.value = 0.3 + idx * 0.05;
+            lpf.connect(wg); wg.connect(dest);
+            loopNoise('brown', lpf);
+            var lfo = audioCtx.createOscillator();
+            var lg  = audioCtx.createGain(); lg.gain.value = 0.28;
+            lfo.frequency.value = 0.12 + idx * 0.04;
+            lfo.connect(lg); lg.connect(wg.gain);
+            lfo.start(); ambientNodes.push(lfo);
+        })(i);
     }
-    // high freq sea spray
-    const hpf = audioCtx.createBiquadFilter();
+    var hpf = audioCtx.createBiquadFilter();
     hpf.type = 'highpass'; hpf.frequency.value = 3000;
-    const sprayGain = audioCtx.createGain(); sprayGain.gain.value = 0.04;
-    hpf.connect(sprayGain); sprayGain.connect(dest);
+    var sg = audioCtx.createGain(); sg.gain.value = 0.04;
+    hpf.connect(sg); sg.connect(dest);
     loopNoise('white', hpf);
 }
 
-// 🌧️ RAIN
+// Rain
 function buildRain(dest) {
-    // pink noise through highpass = rain texture
-    const hpf = audioCtx.createBiquadFilter();
+    var hpf = audioCtx.createBiquadFilter();
     hpf.type = 'highpass'; hpf.frequency.value = 1200;
-    const g = audioCtx.createGain(); g.gain.value = 0.6;
+    var g = audioCtx.createGain(); g.gain.value = 0.6;
     hpf.connect(g); g.connect(dest);
     loopNoise('pink', hpf);
-
-    // lower rumble for thunder-like resonance
-    const lpf = audioCtx.createBiquadFilter();
+    var lpf = audioCtx.createBiquadFilter();
     lpf.type = 'lowpass'; lpf.frequency.value = 300;
-    const g2 = audioCtx.createGain(); g2.gain.value = 0.15;
+    var g2 = audioCtx.createGain(); g2.gain.value = 0.15;
     lpf.connect(g2); g2.connect(dest);
     loopNoise('brown', lpf);
-
-    // occasional drip tones
     scheduleDrips(dest);
 }
-
 function scheduleDrips(dest) {
     if (!isRunning || ambientType !== 'rain') return;
-    const osc = audioCtx.createOscillator();
-    const g   = audioCtx.createGain();
-    osc.connect(g); g.connect(dest);
-    osc.frequency.value = 1200 + Math.random() * 800;
-    osc.type = 'sine';
-    const t = audioCtx.currentTime;
-    g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(0.04, t + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
-    osc.start(t); osc.stop(t + 0.2);
-    ambientNodes.push(osc);
-    setTimeout(() => scheduleDrips(dest), 300 + Math.random() * 900);
+    try {
+        var osc = audioCtx.createOscillator();
+        var g   = audioCtx.createGain();
+        osc.connect(g); g.connect(dest);
+        osc.frequency.value = 1200 + Math.random() * 800;
+        osc.type = 'sine';
+        var t = audioCtx.currentTime;
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(0.04, t + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+        osc.start(t); osc.stop(t + 0.2);
+        ambientNodes.push(osc);
+    } catch(e) {}
+    setTimeout(function() { scheduleDrips(dest); }, 300 + Math.random() * 900);
 }
 
-// 🌿 FOREST
+// Forest
 function buildForest(dest) {
-    // low wind base
-    const lpf = audioCtx.createBiquadFilter();
+    var lpf = audioCtx.createBiquadFilter();
     lpf.type = 'lowpass'; lpf.frequency.value = 400;
-    const windGain = audioCtx.createGain(); windGain.gain.value = 0.12;
-    lpf.connect(windGain); windGain.connect(dest);
+    var wg = audioCtx.createGain(); wg.gain.value = 0.12;
+    lpf.connect(wg); wg.connect(dest);
     loopNoise('brown', lpf);
-
-    // rustling leaves = band-passed noise
-    const bpf = audioCtx.createBiquadFilter();
+    var bpf = audioCtx.createBiquadFilter();
     bpf.type = 'bandpass'; bpf.frequency.value = 2000; bpf.Q.value = 0.5;
-    const leafGain = audioCtx.createGain(); leafGain.gain.value = 0.18;
-    bpf.connect(leafGain); leafGain.connect(dest);
+    var lg = audioCtx.createGain(); lg.gain.value = 0.18;
+    bpf.connect(lg); lg.connect(dest);
     loopNoise('pink', bpf);
-
-    // bird chirps
     scheduleBirds(dest);
 }
-
 function scheduleBirds(dest) {
     if (!isRunning || ambientType !== 'forest') return;
-    const count = 2 + Math.floor(Math.random() * 3);
-    for (let i = 0; i < count; i++) {
-        setTimeout(() => {
-            if (!isRunning || ambientType !== 'forest') return;
-            chirp(dest, 2400 + Math.random() * 1800, 0.06 + Math.random() * 0.04);
-        }, i * (80 + Math.random() * 120));
+    var count = 2 + Math.floor(Math.random() * 3);
+    for (var i = 0; i < count; i++) {
+        (function(idx) {
+            setTimeout(function() {
+                if (!isRunning || ambientType !== 'forest') return;
+                chirp(dest, 2400 + Math.random() * 1800, 0.06 + Math.random() * 0.04);
+            }, idx * (80 + Math.random() * 120));
+        })(i);
     }
-    setTimeout(() => scheduleBirds(dest), 3000 + Math.random() * 7000);
+    setTimeout(function() { scheduleBirds(dest); }, 3000 + Math.random() * 7000);
 }
-
 function chirp(dest, freq, vol) {
-    const osc = audioCtx.createOscillator();
-    const g   = audioCtx.createGain();
-    osc.connect(g); g.connect(dest);
-    osc.type = 'sine';
-    const t = audioCtx.currentTime;
-    osc.frequency.setValueAtTime(freq, t);
-    osc.frequency.linearRampToValueAtTime(freq * 1.15, t + 0.06);
-    osc.frequency.linearRampToValueAtTime(freq * 0.95, t + 0.14);
-    g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(vol, t + 0.02);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
-    osc.start(t); osc.stop(t + 0.22);
-    ambientNodes.push(osc);
-}
-
-// 💨 WIND
-function buildWind(dest) {
-    // multiple band-passed noise layers
-    [300, 700, 1400].forEach((freq, i) => {
-        const bpf = audioCtx.createBiquadFilter();
-        bpf.type = 'bandpass'; bpf.frequency.value = freq; bpf.Q.value = 1.2;
-        const g = audioCtx.createGain(); g.gain.value = 0.2 - i * 0.04;
-        bpf.connect(g); g.connect(dest);
-        loopNoise('pink', bpf);
-
-        // slow gusts via LFO
-        const lfo = audioCtx.createOscillator();
-        const lfoG = audioCtx.createGain(); lfoG.gain.value = 0.15;
-        lfo.frequency.value = 0.08 + i * 0.03;
-        lfo.connect(lfoG); lfoG.connect(g.gain);
-        lfo.start(); ambientNodes.push(lfo);
-    });
-}
-
-// 🎵 TIBETAN BOWLS
-function buildBowls(dest) {
-    scheduleBowlStrike(dest);
-}
-
-function scheduleBowlStrike(dest) {
-    if (!isRunning || ambientType !== 'bowls') return;
-    const bowlFreqs = [210, 264, 315, 396, 432, 528];
-    const freq = bowlFreqs[Math.floor(Math.random() * bowlFreqs.length)];
-    const harmonic = Math.random() > 0.5 ? 2 : 3;
-    const decay = 4 + Math.random() * 5;
-
-    [freq, freq * harmonic, freq * harmonic * 1.5].forEach((f, i) => {
-        const osc = audioCtx.createOscillator();
-        const g   = audioCtx.createGain();
+    try {
+        var osc = audioCtx.createOscillator();
+        var g   = audioCtx.createGain();
         osc.connect(g); g.connect(dest);
         osc.type = 'sine';
-        osc.frequency.value = f;
-        const t = audioCtx.currentTime;
-        const vol = [0.35, 0.12, 0.06][i];
+        var t = audioCtx.currentTime;
+        osc.frequency.setValueAtTime(freq, t);
+        osc.frequency.linearRampToValueAtTime(freq * 1.15, t + 0.06);
+        osc.frequency.linearRampToValueAtTime(freq * 0.95, t + 0.14);
         g.gain.setValueAtTime(0, t);
-        g.gain.linearRampToValueAtTime(vol, t + 0.01);
-        g.gain.exponentialRampToValueAtTime(0.0001, t + decay);
-        osc.start(t); osc.stop(t + decay + 0.1);
+        g.gain.linearRampToValueAtTime(vol, t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
+        osc.start(t); osc.stop(t + 0.22);
         ambientNodes.push(osc);
-    });
-
-    setTimeout(() => scheduleBowlStrike(dest), (decay + 1.5 + Math.random() * 4) * 1000);
+    } catch(e) {}
 }
 
-// ==================== BREATHING ====================
-const phaseNames = { inspire:'Inspiration', hold_inspire:'Retenue', expire:'Expiration', hold_expire:'Retenue' };
+// Wind
+function buildWind(dest) {
+    var freqs = [300, 700, 1400];
+    var vols  = [0.20, 0.16, 0.12];
+    for (var i = 0; i < freqs.length; i++) {
+        (function(idx) {
+            var bpf = audioCtx.createBiquadFilter();
+            bpf.type = 'bandpass'; bpf.frequency.value = freqs[idx]; bpf.Q.value = 1.2;
+            var g = audioCtx.createGain(); g.gain.value = vols[idx];
+            bpf.connect(g); g.connect(dest);
+            loopNoise('pink', bpf);
+            var lfo = audioCtx.createOscillator();
+            var lg  = audioCtx.createGain(); lg.gain.value = 0.15;
+            lfo.frequency.value = 0.08 + idx * 0.03;
+            lfo.connect(lg); lg.connect(g.gain);
+            lfo.start(); ambientNodes.push(lfo);
+        })(i);
+    }
+}
 
+// Bowls
+function buildBowls(dest) { scheduleBowlStrike(dest); }
+function scheduleBowlStrike(dest) {
+    if (!isRunning || ambientType !== 'bowls') return;
+    try {
+        var bowlFreqs = [210, 264, 315, 396, 432, 528];
+        var freq  = bowlFreqs[Math.floor(Math.random() * bowlFreqs.length)];
+        var harm  = Math.random() > 0.5 ? 2 : 3;
+        var decay = 4 + Math.random() * 5;
+        var fList = [freq, freq * harm, freq * harm * 1.5];
+        var vList = [0.35, 0.12, 0.06];
+        for (var i = 0; i < fList.length; i++) {
+            (function(f, v) {
+                var osc = audioCtx.createOscillator();
+                var g   = audioCtx.createGain();
+                osc.connect(g); g.connect(dest);
+                osc.type = 'sine'; osc.frequency.value = f;
+                var t = audioCtx.currentTime;
+                g.gain.setValueAtTime(0, t);
+                g.gain.linearRampToValueAtTime(v, t + 0.01);
+                g.gain.exponentialRampToValueAtTime(0.0001, t + decay);
+                osc.start(t); osc.stop(t + decay + 0.1);
+                ambientNodes.push(osc);
+            })(fList[i], vList[i]);
+        }
+        setTimeout(function() { scheduleBowlStrike(dest); }, (decay + 1.5 + Math.random() * 4) * 1000);
+    } catch(e) {}
+}
+
+// ===== BREATHING =====
 function formatTime(s) {
-    return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+    var m = Math.floor(s / 60);
+    var sec = s % 60;
+    return (m < 10 ? '0' : '') + m + ':' + (sec < 10 ? '0' : '') + sec;
 }
-
 function updateSessionTick() {
     if (!sessionStartTime) return;
-    const e = Math.floor((Date.now() - sessionStartTime) / 1000);
+    var e = Math.floor((Date.now() - sessionStartTime) / 1000);
     document.getElementById('sessionTimer').textContent = formatTime(e);
     if (targetDurationSec > 0 && e >= targetDurationSec) {
         stopBreathing();
-        document.getElementById('phaseText').textContent  = 'Terminé';
-        document.getElementById('timerDisplay').textContent = '✓';
+        document.getElementById('phaseText').textContent   = 'Terminé';
+        document.getElementById('timerDisplay').textContent = '';
         playTone('finish');
         doVibrate([200,100,200]);
-        showToast('Session terminée ✓');
+        showToast('Session terminée');
         saveSessionStats();
     }
 }
-
 function saveSessionStats() {
     if (!sessionStartTime) return;
-    const mins = Math.round((Date.now() - sessionStartTime) / 60000);
-    const preset = document.querySelector('.preset-chip.active')?.textContent || 'Custom';
-    stats.sessions.push({ date: new Date().toISOString(), duration: mins, mood: selectedMood, preset });
+    var mins = Math.round((Date.now() - sessionStartTime) / 60000);
+    var activeChip = document.querySelector('.preset-chip.active');
+    var preset = activeChip ? activeChip.textContent : 'Custom';
+    stats.sessions.push({ date: new Date().toISOString(), duration: mins, mood: selectedMood, preset: preset });
     stats.totalSessions++;
     stats.totalMinutes += mins;
-    const today = new Date().toDateString();
+    var today = new Date().toDateString();
     if (stats.lastSessionDate !== today) {
-        const yest = new Date(Date.now() - 86400000).toDateString();
+        var yest = new Date(Date.now() - 86400000).toDateString();
         stats.streak = (stats.lastSessionDate === yest) ? stats.streak + 1 : 1;
         stats.lastSessionDate = today;
     }
     saveData(); updateStatsDisplay();
 }
 
-async function breatheCycle() {
+// Breathing cycle — ES5 sans async/await (callbacks imbriqués)
+function breatheCycle() {
     if (!isRunning) return;
-    await runPhase('inspire',      +document.getElementById('inspireTime').value);
-    if (!isRunning) return;
-    await runPhase('hold_inspire', +document.getElementById('holdInspireTime').value);
-    if (!isRunning) return;
-    await runPhase('expire',       +document.getElementById('expireTime').value);
-    if (!isRunning) return;
-    await runPhase('hold_expire',  +document.getElementById('holdExpireTime').value);
-    if (isRunning) breatheCycle();
+    runPhase('inspire', parseInt(document.getElementById('inspireTime').value, 10), function() {
+        if (!isRunning) return;
+        runPhase('hold_inspire', parseInt(document.getElementById('holdInspireTime').value, 10), function() {
+            if (!isRunning) return;
+            runPhase('expire', parseInt(document.getElementById('expireTime').value, 10), function() {
+                if (!isRunning) return;
+                runPhase('hold_expire', parseInt(document.getElementById('holdExpireTime').value, 10), function() {
+                    if (isRunning) breatheCycle();
+                });
+            });
+        });
+    });
 }
 
-async function runPhase(phase, dur) {
-    if (dur === 0) return;
-    const circle  = document.getElementById('circle');
-    const phaseEl = document.getElementById('phaseText');
-    const countEl = document.getElementById('timerDisplay');
+function runPhase(phase, dur, callback) {
+    if (dur === 0) { callback(); return; }
+    var circle  = document.getElementById('circle');
+    var phaseEl = document.getElementById('phaseText');
+    var countEl = document.getElementById('timerDisplay');
 
-    // Reset — force reflow before re-adding class (Android needs this)
     circle.className = 'circle';
     circle.style.webkitAnimationName = 'none';
     circle.style.animationName = 'none';
-    // eslint-disable-next-line no-unused-expressions
-    circle.offsetWidth; // trigger reflow
+    void circle.offsetWidth; // reflow
 
-    // Set duration directly on the element (more reliable than CSS vars on Android WebView)
-    const durStr = dur + 's';
+    var durStr = dur + 's';
     circle.style.webkitAnimationDuration = durStr;
     circle.style.animationDuration       = durStr;
     circle.style.webkitAnimationName     = '';
     circle.style.animationName           = '';
 
-    if (phase === 'inspire')      circle.classList.add('active-inspire');
-    else if (phase === 'expire')  circle.classList.add('active-expire');
+    if (phase === 'inspire')     circle.classList.add('active-inspire');
+    else if (phase === 'expire') circle.classList.add('active-expire');
     else {
-        // hold phases — subtle pulse
-        circle.style.webkitTransform = phase === 'hold_inspire' ? 'scale(1.2) translateZ(0)' : 'scale(1) translateZ(0)';
-        circle.style.transform       = phase === 'hold_inspire' ? 'scale(1.2) translateZ(0)' : 'scale(1) translateZ(0)';
+        var sc = phase === 'hold_inspire' ? 'scale(1.2) translateZ(0)' : 'scale(1) translateZ(0)';
+        circle.style.webkitTransform = sc;
+        circle.style.transform       = sc;
     }
 
     phaseEl.textContent = phaseNames[phase];
     playTone(phase);
     doVibrate(30);
 
-    let r = dur;
+    var r = dur;
     countEl.textContent = r;
-    return new Promise(resolve => {
-        timerInterval = setInterval(() => {
-            r--;
-            countEl.textContent = r;
-            if (r <= 0) { clearInterval(timerInterval); resolve(); }
-        }, 1000);
-    });
+    timerInterval = setInterval(function() {
+        r--;
+        countEl.textContent = r;
+        if (r <= 0) { clearInterval(timerInterval); if (isRunning) callback(); }
+    }, 1000);
 }
 
 function handleCircleClick() {
-    isRunning ? stopBreathing() : startBreathing();
+    if (isRunning) stopBreathing(); else startBreathing();
 }
-
 function startBreathing() {
     initAudio();
     isRunning = true;
     document.getElementById('startBtn').disabled = true;
     document.getElementById('stopBtn').disabled  = false;
-    targetDurationSec = +document.getElementById('targetDuration').value * 60;
+    targetDurationSec = parseInt(document.getElementById('targetDuration').value, 10) * 60;
     sessionStartTime  = Date.now();
     sessionInterval   = setInterval(updateSessionTick, 1000);
     startAmbient();
     breatheCycle();
 }
-
 function stopBreathing() {
     isRunning = false;
-    stopAmbient();
     clearInterval(timerInterval);
     clearInterval(sessionInterval);
+    stopAmbient();
     document.getElementById('startBtn').disabled = false;
     document.getElementById('stopBtn').disabled  = true;
-    document.getElementById('phaseText').textContent   = 'Toucher';
-    document.getElementById('timerDisplay').textContent = '–';
+    document.getElementById('phaseText').textContent    = 'Toucher';
+    document.getElementById('timerDisplay').textContent = '--';
     document.getElementById('sessionTimer').textContent = '00:00';
-    const c = document.getElementById('circle');
+    var c = document.getElementById('circle');
     c.className = 'circle';
-    c.style.webkitAnimationName     = '';
-    c.style.animationName           = '';
-    c.style.webkitAnimationDuration = '';
-    c.style.animationDuration       = '';
-    c.style.webkitTransform         = 'scale(1) translateZ(0)';
-    c.style.transform               = 'scale(1) translateZ(0)';
+    c.style.webkitAnimationName = ''; c.style.animationName = '';
+    c.style.webkitAnimationDuration = ''; c.style.animationDuration = '';
+    c.style.webkitTransform = 'scale(1) translateZ(0)';
+    c.style.transform       = 'scale(1) translateZ(0)';
     sessionStartTime = null;
 }
 
-// ==================== TABS ====================
+// ===== TABS =====
 function switchTab(name, el) {
-    document.querySelectorAll('.tab').forEach(function(t){ t.classList.remove('active'); });
-    document.querySelectorAll('.nav-btn').forEach(function(b){ b.classList.remove('active'); });
+    var tabs = document.querySelectorAll('.tab');
+    var navs = document.querySelectorAll('.nav-btn');
+    for (var i = 0; i < tabs.length; i++) tabs[i].classList.remove('active');
+    for (var j = 0; j < navs.length; j++) navs[j].classList.remove('active');
     document.getElementById('tab-' + name).classList.add('active');
-    if (el) el.classList.add('active');
+    if (el && el.classList) el.classList.add('active');
 }
 
-// ==================== MOOD ====================
+// ===== MOOD =====
 function selectMood(mood, el) {
     selectedMood = mood;
-    document.querySelectorAll('.mood-btn').forEach(function(b){ b.classList.remove('selected'); });
+    var btns = document.querySelectorAll('.mood-btn');
+    for (var i = 0; i < btns.length; i++) btns[i].classList.remove('selected');
     if (el && el.classList) el.classList.add('selected');
 }
 
-// ==================== THEME ====================
+// ===== THEME =====
 function applyLight() {
-    document.documentElement.style.setProperty('--bg',       '#f0ede8');
-    document.documentElement.style.setProperty('--bg2',      '#e8e4de');
-    document.documentElement.style.setProperty('--surface',  'rgba(0,0,0,0.04)');
-    document.documentElement.style.setProperty('--surface2', 'rgba(0,0,0,0.07)');
-    document.documentElement.style.setProperty('--border',   'rgba(0,0,0,0.1)');
-    document.documentElement.style.setProperty('--text',     '#2c2820');
-    document.documentElement.style.setProperty('--text-dim', 'rgba(44,40,32,0.45)');
-    document.documentElement.style.setProperty('--text-mid', 'rgba(44,40,32,0.7)');
-    document.getElementById('themeBtn').textContent = '☀️';
+    var r = document.documentElement.style;
+    r.setProperty('--bg',       '#f0ede8');
+    r.setProperty('--bg2',      '#e8e4de');
+    r.setProperty('--surface',  'rgba(0,0,0,0.04)');
+    r.setProperty('--surface2', 'rgba(0,0,0,0.07)');
+    r.setProperty('--border',   'rgba(0,0,0,0.1)');
+    r.setProperty('--text',     '#2c2820');
+    r.setProperty('--text-dim', 'rgba(44,40,32,0.45)');
+    r.setProperty('--text-mid', 'rgba(44,40,32,0.7)');
+    document.getElementById('themeBtn').textContent = '';
     document.getElementById('darkModeToggle').checked = false;
 }
 function applyDark() {
-    document.documentElement.style.removeProperty('--bg');
-    document.documentElement.style.removeProperty('--bg2');
-    document.documentElement.style.removeProperty('--surface');
-    document.documentElement.style.removeProperty('--surface2');
-    document.documentElement.style.removeProperty('--border');
-    document.documentElement.style.removeProperty('--text');
-    document.documentElement.style.removeProperty('--text-dim');
-    document.documentElement.style.removeProperty('--text-mid');
-    document.getElementById('themeBtn').textContent = '🌙';
+    var r = document.documentElement.style;
+    r.removeProperty('--bg'); r.removeProperty('--bg2');
+    r.removeProperty('--surface'); r.removeProperty('--surface2');
+    r.removeProperty('--border'); r.removeProperty('--text');
+    r.removeProperty('--text-dim'); r.removeProperty('--text-mid');
+    document.getElementById('themeBtn').textContent = '';
     document.getElementById('darkModeToggle').checked = true;
 }
 function toggleTheme() {
-    const light = localStorage.getItem('theme') === 'light';
-    if (light) { applyDark(); localStorage.setItem('theme','dark'); }
-    else        { applyLight(); localStorage.setItem('theme','light'); }
+    if (localStorage.getItem('theme') === 'light') { applyDark();  localStorage.setItem('theme','dark'); }
+    else                                            { applyLight(); localStorage.setItem('theme','light'); }
 }
 function toggleThemeFromSettings() {
-    if (document.getElementById('darkModeToggle').checked) { applyDark(); localStorage.setItem('theme','dark'); }
-    else { applyLight(); localStorage.setItem('theme','light'); }
+    if (document.getElementById('darkModeToggle').checked) { applyDark();  localStorage.setItem('theme','dark'); }
+    else                                                    { applyLight(); localStorage.setItem('theme','light'); }
 }
 
-// ==================== ACCESSIBILITY ====================
+// ===== ACCESSIBILITY =====
 function toggleLargeText() {
-    const on = document.getElementById('largeTextToggle').checked;
+    var on = document.getElementById('largeTextToggle').checked;
     document.body.style.fontSize = on ? '1.15em' : '';
     localStorage.setItem('largeText', on);
 }
 
-// ==================== TOAST ====================
+// ===== TOAST =====
 function showToast(msg) {
-    const el = document.getElementById('toast');
+    var el = document.getElementById('toast');
     el.textContent = msg;
     el.classList.add('show');
-    setTimeout(() => el.classList.remove('show'), 3000);
+    setTimeout(function() { el.classList.remove('show'); }, 3000);
 }
 
-// ==================== STATS ====================
+// ===== STATS =====
 function updateStatsDisplay() {
     document.getElementById('totalSessions').textContent = stats.totalSessions;
     document.getElementById('totalMinutes').textContent  = stats.totalMinutes;
-    document.getElementById('avgDuration').textContent   = stats.totalSessions ? Math.round(stats.totalMinutes/stats.totalSessions) : 0;
+    document.getElementById('avgDuration').textContent   = stats.totalSessions ? Math.round(stats.totalMinutes / stats.totalSessions) : 0;
     document.getElementById('currentStreak').textContent = stats.streak;
-    const list = document.getElementById('historyList');
+    var list = document.getElementById('historyList');
     if (!stats.sessions.length) {
-        list.innerHTML = '<div class="empty-state">Aucune session enregistrée</div>';
+        list.innerHTML = '<div class="empty-state">Aucune session enregistree</div>';
         return;
     }
-    list.innerHTML = stats.sessions.slice(-10).reverse().map(s => {
-        const d = new Date(s.date).toLocaleDateString('fr-FR', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
-        return `<div class="history-item">
-            <div>
-                <div class="history-date">${d}</div>
-                <div class="history-meta">${s.mood || '—'} · ${s.preset || ''}</div>
-            </div>
-            <div class="history-dur">${s.duration} min</div>
-        </div>`;
-    }).join('');
+    var html = '';
+    var slice = stats.sessions.slice(-10).reverse();
+    for (var i = 0; i < slice.length; i++) {
+        var s = slice[i];
+        var d = new Date(s.date).toLocaleDateString('fr-FR', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+        html += '<div class="history-item">' +
+            '<div><div class="history-date">' + d + '</div>' +
+            '<div class="history-meta">' + (s.mood || '--') + ' - ' + (s.preset || '') + '</div></div>' +
+            '<div class="history-dur">' + s.duration + ' min</div></div>';
+    }
+    list.innerHTML = html;
 }
 function clearStats() {
     if (!confirm('Effacer toutes les statistiques ?')) return;
     stats = { sessions:[], totalSessions:0, totalMinutes:0, streak:0, lastSessionDate:null };
     saveData(); updateStatsDisplay();
-    showToast('Statistiques effacées');
+    showToast('Statistiques effacees');
 }
 
-// ==================== EXPORT / IMPORT ====================
+// ===== EXPORT / IMPORT =====
 function exportData() {
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([JSON.stringify(stats,null,2)], {type:'application/json'}));
-    a.download = `souffle-${new Date().toISOString().slice(0,10)}.json`;
-    a.click();
-    showToast('Données exportées');
+    try {
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([JSON.stringify(stats, null, 2)], {type:'application/json'}));
+        a.download = 'souffle-' + new Date().toISOString().slice(0,10) + '.json';
+        a.click();
+        showToast('Donnees exportees');
+    } catch(e) { showToast('Export non supporté sur cet appareil'); }
 }
 function importData(e) {
-    const file = e.target.files[0]; if (!file) return;
-    const r = new FileReader();
-    r.onload = ev => {
+    var file = e.target.files[0]; if (!file) return;
+    var r = new FileReader();
+    r.onload = function(ev) {
         try {
-            const d = JSON.parse(ev.target.result);
-            if (d.sessions) { stats = d; saveData(); updateStatsDisplay(); showToast('Données importées'); }
+            var d = JSON.parse(ev.target.result);
+            if (d.sessions) { stats = d; saveData(); updateStatsDisplay(); showToast('Donnees importees'); }
             else alert('Format invalide');
-        } catch { alert("Erreur d'importation"); }
+        } catch(err) { alert("Erreur d'importation"); }
     };
     r.readAsText(file);
 }
 
-// ==================== REMINDER ====================
+// ===== REMINDER =====
 function setupDailyReminder() {
-    if ('Notification' in window)
-        Notification.requestPermission().then(p => showToast(p === 'granted' ? 'Rappel activé' : 'Permission refusée'));
-    else showToast('Non supporté');
+    if ('Notification' in window) {
+        Notification.requestPermission().then(function(p) {
+            showToast(p === 'granted' ? 'Rappel active' : 'Permission refusee');
+        });
+    } else showToast('Non supporte');
 }
 
-// ==================== INIT & EVENT WIRING ====================
-// Appilix/Android WebView : touchstart est plus fiable que touchend ou click.
-// On désactive preventDefault uniquement sur les boutons (pas les sliders/inputs).
+// ===== INIT & EVENT WIRING =====
+// tap() : touchstart + click fallback, anti-doublon
 function tap(el, fn) {
     if (!el) return;
     var touched = false;
     el.addEventListener('touchstart', function(e) {
         touched = true;
-        e.preventDefault(); // bloque le click fantôme 300ms
+        e.preventDefault();
         fn(e);
     }, { passive: false });
     el.addEventListener('click', function(e) {
-        if (touched) { touched = false; return; } // évite double-déclenchement
+        if (touched) { touched = false; return; }
         fn(e);
     }, false);
 }
 
-// Débloque l'AudioContext au premier touch (obligatoire Android WebView)
-var audioUnlocked = false;
 function unlockAudio() {
     if (audioUnlocked) return;
     audioUnlocked = true;
@@ -1602,85 +1596,78 @@ function unlockAudio() {
     } catch(e) {}
 }
 document.addEventListener('touchstart', unlockAudio, { passive: true });
-document.addEventListener('click', unlockAudio, { passive: true });
+document.addEventListener('click',      unlockAudio, { passive: true });
 
-// Attend que le DOM soit prêt (compatible Android WebView ancien)
 function domReady(fn) {
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', fn);
-    } else {
-        fn();
-    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn);
+    else fn();
 }
 
 domReady(function() {
     loadData();
     initSliders();
-    updateValues();
     updateVolume();
 
-    // Theme button
     tap(document.getElementById('themeBtn'), toggleTheme);
 
-    // Nav tabs
-    document.querySelectorAll('.nav-btn').forEach(function(btn) {
-        tap(btn, function() { switchTab(btn.getAttribute('data-tab'), btn); });
-    });
+    var navBtns = document.querySelectorAll('.nav-btn');
+    for (var ni = 0; ni < navBtns.length; ni++) {
+        (function(btn) {
+            tap(btn, function() { switchTab(btn.getAttribute('data-tab'), btn); });
+        })(navBtns[ni]);
+    }
 
-    // Circle
     tap(document.getElementById('circleOuter'), handleCircleClick);
+    tap(document.getElementById('startBtn'),    startBreathing);
+    tap(document.getElementById('stopBtn'),     stopBreathing);
 
-    // Start / Stop
-    tap(document.getElementById('startBtn'), startBreathing);
-    tap(document.getElementById('stopBtn'),  stopBreathing);
+    var moodBtns = document.querySelectorAll('.mood-btn');
+    for (var mi = 0; mi < moodBtns.length; mi++) {
+        (function(btn) {
+            tap(btn, function() { selectMood(btn.getAttribute('data-mood'), btn); });
+        })(moodBtns[mi]);
+    }
 
-    // Mood buttons
-    document.querySelectorAll('.mood-btn').forEach(function(btn) {
-        tap(btn, function() { selectMood(btn.getAttribute('data-mood'), btn); });
-    });
+    var presetBtns = document.querySelectorAll('.preset-chip');
+    for (var pi = 0; pi < presetBtns.length; pi++) {
+        (function(btn) {
+            tap(btn, function() { loadPreset(btn.getAttribute('data-preset'), btn); });
+        })(presetBtns[pi]);
+    }
 
-    // Preset chips
-    document.querySelectorAll('.preset-chip').forEach(function(btn) {
-        tap(btn, function() { loadPreset(btn.getAttribute('data-preset'), btn); });
-    });
+    var ambBtns = document.querySelectorAll('.ambient-btn');
+    for (var ai = 0; ai < ambBtns.length; ai++) {
+        (function(btn) {
+            tap(btn, function() { selectAmbient(btn.getAttribute('data-ambient'), btn); });
+        })(ambBtns[ai]);
+    }
 
-    // Ambient buttons
-    document.querySelectorAll('.ambient-btn').forEach(function(btn) {
-        tap(btn, function() { selectAmbient(btn.getAttribute('data-ambient'), btn); });
-    });
+    var volSlider = document.getElementById('volumeSlider');
+    volSlider.addEventListener('input',  updateVolume);
+    volSlider.addEventListener('change', updateVolume);
 
-    // Volume sliders — input + change pour compatibilité max
-    ['volumeSlider', 'ambVolumeSlider'].forEach(function(id) {
-        var el = document.getElementById(id);
-        if (!el) return;
-        el.addEventListener('input',  id === 'volumeSlider' ? updateVolume : updateAmbVolume);
-        el.addEventListener('change', id === 'volumeSlider' ? updateVolume : updateAmbVolume);
-        el.addEventListener('touchmove', function(e) { e.stopPropagation(); }, { passive: true });
-    });
+    var ambVolSlider = document.getElementById('ambVolumeSlider');
+    ambVolSlider.addEventListener('input',  updateAmbVolume);
+    ambVolSlider.addEventListener('change', updateAmbVolume);
 
-    // Param sliders
-    ['inspireTime','holdInspireTime','expireTime','holdExpireTime','targetDuration'].forEach(function(id) {
-        var el = document.getElementById(id);
-        if (!el) return;
-        el.addEventListener('input',  function(){ updateValues(); });
-        el.addEventListener('change', function(){ updateValues(); });
-        el.addEventListener('touchmove', function(e) { e.stopPropagation(); }, { passive: true });
-    });
+    var pSliders = ['inspireTime','holdInspireTime','expireTime','holdExpireTime','targetDuration'];
+    for (var si = 0; si < pSliders.length; si++) {
+        (function(id) {
+            var el = document.getElementById(id);
+            if (!el) return;
+            el.addEventListener('input',  updateValues);
+            el.addEventListener('change', updateValues);
+        })(pSliders[si]);
+    }
 
-    // Checkboxes — on utilise 'change' uniquement (natif, pas besoin de tap)
     document.getElementById('largeTextToggle').addEventListener('change', toggleLargeText);
-    document.getElementById('darkModeToggle').addEventListener('change', toggleThemeFromSettings);
-    var reminderToggle = document.getElementById('dailyReminderToggle');
-    if (reminderToggle) reminderToggle.addEventListener('change', setupDailyReminder);
+    document.getElementById('darkModeToggle').addEventListener('change',  toggleThemeFromSettings);
+    var rt = document.getElementById('dailyReminderToggle');
+    if (rt) rt.addEventListener('change', setupDailyReminder);
 
-    // Stats clear
     tap(document.getElementById('clearStatsBtn'), clearStats);
-
-    // Export / Import
-    tap(document.getElementById('exportBtn'), exportData);
-    tap(document.getElementById('importBtn'), function() {
-        document.getElementById('fileInput').click();
-    });
+    tap(document.getElementById('exportBtn'),     exportData);
+    tap(document.getElementById('importBtn'),     function() { document.getElementById('fileInput').click(); });
     document.getElementById('fileInput').addEventListener('change', importData);
 });
 </script>
