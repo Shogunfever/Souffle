@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Souffle</title>
     <link rel="manifest" href="./manifest.json">
     <meta name="theme-color" content="#0f1117">
@@ -15,6 +15,29 @@
 
     <style>
         *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        /* ===== ANDROID WEBVIEW / APPILIX TAP FIX ===== */
+        html { touch-action: manipulation; }
+        button,
+        input[type="range"],
+        input[type="checkbox"],
+        label,
+        .nav-btn,
+        .btn,
+        .mood-btn,
+        .preset-chip,
+        .ambient-btn,
+        .toggle,
+        .circle-outer,
+        .theme-btn,
+        .data-btn,
+        .stats-clear-btn {
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-user-select: none;
+            user-select: none;
+            cursor: pointer;
+        }
 
         :root {
             --bg:        #0d0f14;
@@ -649,6 +672,21 @@
         }
         .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
+        /* ===== TOUCH — supprime le délai 300ms Android ===== */
+        button, input[type="range"], label.toggle, .circle-outer,
+        .mood-btn, .preset-chip, .ambient-btn, .nav-btn, .data-btn,
+        .stats-clear-btn, .theme-btn {
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-user-select: none;
+            user-select: none;
+            cursor: pointer;
+        }
+        input[type="range"] {
+            touch-action: pan-x;
+            cursor: pointer;
+        }
+
         /* ===== SCROLLBAR ===== */
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
@@ -669,14 +707,14 @@
     <!-- Header -->
     <div class="header">
         <div class="header-title">Souffle<span>.</span></div>
-        <button class="theme-btn" id="themeBtn" onclick="toggleTheme()" title="Thème">🌙</button>
+        <button class="theme-btn" id="themeBtn" title="Thème">🌙</button>
     </div>
 
     <!-- Nav -->
     <div class="nav">
-        <button class="nav-btn active" onclick="switchTab('breathe', event)">Respirer</button>
-        <button class="nav-btn" onclick="switchTab('stats', event)">Statistiques</button>
-        <button class="nav-btn" onclick="switchTab('settings', event)">Réglages</button>
+        <button class="nav-btn active" data-tab="breathe">Respirer</button>
+        <button class="nav-btn" data-tab="stats">Statistiques</button>
+        <button class="nav-btn" data-tab="settings">Réglages</button>
     </div>
 
     <!-- ===== TAB : BREATHE ===== -->
@@ -684,7 +722,7 @@
 
         <!-- Circle -->
         <div class="circle-wrap">
-            <div class="circle-outer" onclick="handleCircleClick()">
+            <div class="circle-outer" id="circleOuter">
                 <div class="ripple"></div>
                 <div class="ripple"></div>
                 <div class="ripple"></div>
@@ -700,19 +738,19 @@
 
         <!-- Boutons -->
         <div class="actions">
-            <button class="btn btn-start" id="startBtn" onclick="startBreathing()">▶ Démarrer</button>
-            <button class="btn btn-stop"  id="stopBtn"  onclick="stopBreathing()" disabled>◼ Arrêter</button>
+            <button class="btn btn-start" id="startBtn">▶ Démarrer</button>
+            <button class="btn btn-stop"  id="stopBtn" disabled>◼ Arrêter</button>
         </div>
 
         <!-- Humeur -->
         <div class="section">
             <div class="section-label">Humeur</div>
             <div class="mood-row">
-                <button class="mood-btn" onclick="selectMood('😫', event)">😫</button>
-                <button class="mood-btn" onclick="selectMood('😟', event)">😟</button>
-                <button class="mood-btn" onclick="selectMood('😐', event)">😐</button>
-                <button class="mood-btn" onclick="selectMood('🙂', event)">🙂</button>
-                <button class="mood-btn" onclick="selectMood('😊', event)">😊</button>
+                <button class="mood-btn" data-mood="😫">😫</button>
+                <button class="mood-btn" data-mood="😟">😟</button>
+                <button class="mood-btn" data-mood="😐">😐</button>
+                <button class="mood-btn" data-mood="🙂">🙂</button>
+                <button class="mood-btn" data-mood="😊">😊</button>
             </div>
         </div>
 
@@ -729,7 +767,7 @@
             </div>
             <div class="vol-row">
                 <span class="vol-icon">🔈</span>
-                <input type="range" class="vol-slider" id="volumeSlider" min="0" max="100" value="50" oninput="updateVolume()">
+                <input type="range" class="vol-slider" id="volumeSlider" min="0" max="100" value="50">
                 <span class="vol-val" id="volumeValue">50%</span>
             </div>
             <div class="sound-row">
@@ -746,35 +784,34 @@
         <div class="section">
             <div class="section-label">Son ambiant</div>
             <div class="ambient-grid">
-                <button class="ambient-btn silence active" id="amb-silence" onclick="selectAmbient('silence', event)">
+                <button class="ambient-btn silence active" id="amb-silence" data-ambient="silence">
                     <span class="amb-icon">🤫</span>
                     <span class="amb-label">Silence</span>
                 </button>
-                <button class="ambient-btn" id="amb-waves" onclick="selectAmbient('waves', event)">
+                <button class="ambient-btn" id="amb-waves" data-ambient="waves">
                     <span class="amb-icon">🌊</span>
                     <span class="amb-label">Vagues</span>
                 </button>
-                <button class="ambient-btn" id="amb-rain" onclick="selectAmbient('rain', event)">
+                <button class="ambient-btn" id="amb-rain" data-ambient="rain">
                     <span class="amb-icon">🌧️</span>
                     <span class="amb-label">Pluie</span>
                 </button>
-                <button class="ambient-btn" id="amb-forest" onclick="selectAmbient('forest', event)">
+                <button class="ambient-btn" id="amb-forest" data-ambient="forest">
                     <span class="amb-icon">🌿</span>
                     <span class="amb-label">Forêt</span>
                 </button>
-
-                <button class="ambient-btn" id="amb-wind" onclick="selectAmbient('wind', event)">
+                <button class="ambient-btn" id="amb-wind" data-ambient="wind">
                     <span class="amb-icon">💨</span>
                     <span class="amb-label">Vent</span>
                 </button>
-                <button class="ambient-btn" id="amb-bowls" onclick="selectAmbient('bowls', event)">
+                <button class="ambient-btn" id="amb-bowls" data-ambient="bowls">
                     <span class="amb-icon">🎵</span>
                     <span class="amb-label">Bols</span>
                 </button>
             </div>
             <div class="amb-vol-row hidden" id="ambVolRow">
                 <span class="vol-icon">🔈</span>
-                <input type="range" class="vol-slider" id="ambVolumeSlider" min="0" max="100" value="40" oninput="updateAmbVolume()">
+                <input type="range" class="vol-slider" id="ambVolumeSlider" min="0" max="100" value="40">
                 <span class="vol-val" id="ambVolumeValue">40%</span>
             </div>
         </div>
@@ -783,11 +820,11 @@
         <div class="section">
             <div class="section-label">Techniques classiques</div>
             <div class="presets-grid">
-                <button class="preset-chip active" onclick="loadPreset('coherence', event)">Cohérence 5-5</button>
-                <button class="preset-chip" onclick="loadPreset('relax', event)">Relaxation 4-7-8</button>
-                <button class="preset-chip" onclick="loadPreset('box', event)">Boîte 4-4-4-4</button>
-                <button class="preset-chip" onclick="loadPreset('calm', event)">Calme 6-2-4</button>
-                <button class="preset-chip" onclick="loadPreset('energy', event)">Énergie 3-3</button>
+                <button class="preset-chip active" data-preset="coherence">Cohérence 5-5</button>
+                <button class="preset-chip" data-preset="relax">Relaxation 4-7-8</button>
+                <button class="preset-chip" data-preset="box">Boîte 4-4-4-4</button>
+                <button class="preset-chip" data-preset="calm">Calme 6-2-4</button>
+                <button class="preset-chip" data-preset="energy">Énergie 3-3</button>
             </div>
         </div>
 
@@ -795,9 +832,9 @@
         <div class="section">
             <div class="section-label">Techniques Yogi</div>
             <div class="presets-grid">
-                <button class="preset-chip yogi" onclick="loadPreset('miniyogi', event)">Mini Yogi</button>
-                <button class="preset-chip yogi" onclick="loadPreset('megayogi', event)">Méga Yogi</button>
-                <button class="preset-chip yogi" onclick="loadPreset('megagigayogi', event)">Méga Giga Yogi</button>
+                <button class="preset-chip yogi" data-preset="miniyogi">Mini Yogi</button>
+                <button class="preset-chip yogi" data-preset="megayogi">Méga Yogi</button>
+                <button class="preset-chip yogi" data-preset="megagigayogi">Méga Giga Yogi</button>
             </div>
         </div>
 
@@ -810,35 +847,35 @@
                         <span class="slider-name">Inspiration</span>
                         <span class="slider-val" id="inspireValue">5s</span>
                     </div>
-                    <input type="range" class="param-slider" id="inspireTime" min="1" max="60" value="5" oninput="updateValues(this)">
+                    <input type="range" class="param-slider" id="inspireTime" min="1" max="60" value="5">
                 </div>
                 <div class="slider-row">
                     <div class="slider-head">
                         <span class="slider-name">Retenue inspiration</span>
                         <span class="slider-val" id="holdInspireValue">0s</span>
                     </div>
-                    <input type="range" class="param-slider" id="holdInspireTime" min="0" max="60" value="0" oninput="updateValues(this)">
+                    <input type="range" class="param-slider" id="holdInspireTime" min="0" max="60" value="0">
                 </div>
                 <div class="slider-row">
                     <div class="slider-head">
                         <span class="slider-name">Expiration</span>
                         <span class="slider-val" id="expireValue">5s</span>
                     </div>
-                    <input type="range" class="param-slider" id="expireTime" min="1" max="60" value="5" oninput="updateValues(this)">
+                    <input type="range" class="param-slider" id="expireTime" min="1" max="60" value="5">
                 </div>
                 <div class="slider-row">
                     <div class="slider-head">
                         <span class="slider-name">Retenue expiration</span>
                         <span class="slider-val" id="holdExpireValue">0s</span>
                     </div>
-                    <input type="range" class="param-slider" id="holdExpireTime" min="0" max="60" value="0" oninput="updateValues(this)">
+                    <input type="range" class="param-slider" id="holdExpireTime" min="0" max="60" value="0">
                 </div>
                 <div class="slider-row target-slider">
                     <div class="slider-head">
                         <span class="slider-name">Durée de session</span>
                         <span class="slider-val" id="targetDurationValue">5 min</span>
                     </div>
-                    <input type="range" class="param-slider" id="targetDuration" min="1" max="60" value="5" oninput="updateValues(this)">
+                    <input type="range" class="param-slider" id="targetDuration" min="1" max="60" value="5">
                 </div>
             </div>
         </div>
@@ -866,7 +903,7 @@
         </div>
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
             <div class="history-title" style="margin-bottom:0;">Historique</div>
-            <button class="stats-clear-btn" onclick="clearStats()">Effacer</button>
+            <button class="stats-clear-btn" id="clearStatsBtn">Effacer</button>
         </div>
         <div class="history-list" id="historyList">
             <div class="empty-state">Aucune session enregistrée</div>
@@ -880,7 +917,7 @@
             <div class="setting-row">
                 <span class="setting-name">Texte large</span>
                 <label class="toggle">
-                    <input type="checkbox" id="largeTextToggle" onchange="toggleLargeText()">
+                    <input type="checkbox" id="largeTextToggle">
                     <div class="toggle-track"></div>
                     <div class="toggle-thumb"></div>
                 </label>
@@ -888,7 +925,7 @@
             <div class="setting-row">
                 <span class="setting-name">Mode sombre</span>
                 <label class="toggle">
-                    <input type="checkbox" id="darkModeToggle" checked onchange="toggleThemeFromSettings()">
+                    <input type="checkbox" id="darkModeToggle" checked>
                     <div class="toggle-track"></div>
                     <div class="toggle-thumb"></div>
                 </label>
@@ -898,10 +935,10 @@
         <div class="settings-group">
             <div class="settings-title">Données</div>
             <div class="data-grid">
-                <button class="data-btn" onclick="exportData()">Exporter</button>
-                <button class="data-btn" onclick="document.getElementById('fileInput').click()">Importer</button>
+                <button class="data-btn" id="exportBtn">Exporter</button>
+                <button class="data-btn" id="importBtn">Importer</button>
             </div>
-            <input type="file" id="fileInput" accept=".json" onchange="importData(event)">
+            <input type="file" id="fileInput" accept=".json">
         </div>
 
         <div class="settings-group">
@@ -909,7 +946,7 @@
             <div class="setting-row">
                 <span class="setting-name">Rappel quotidien</span>
                 <label class="toggle">
-                    <input type="checkbox" id="dailyReminderToggle" onchange="setupDailyReminder()">
+                    <input type="checkbox" id="dailyReminderToggle">
                     <div class="toggle-track"></div>
                     <div class="toggle-thumb"></div>
                 </label>
@@ -917,7 +954,7 @@
         </div>
 
         <div class="info-box">
-            <strong>Souffle Pro</strong> — Version 3.0<br>
+            <strong>Souffle Pro</strong> — Version 3.1<br>
             Données stockées localement · Aucune connexion requise
         </div>
     </div>
@@ -988,9 +1025,9 @@ function initSliders() {
 }
 
 // ==================== PRESETS ====================
-function loadPreset(name, e) {
-    document.querySelectorAll('.preset-chip').forEach(b => b.classList.remove('active'));
-    if (e?.target) e.target.classList.add('active');
+function loadPreset(name, el) {
+    document.querySelectorAll('.preset-chip').forEach(function(b){ b.classList.remove('active'); });
+    if (el && el.classList) el.classList.add('active');
     const P = {
         coherence:    [5,  0,  5,  0],
         relax:        [4,  0,  7,  8],
@@ -1042,13 +1079,12 @@ function updateAmbVolume() {
     if (ambientGain) ambientGain.gain.setTargetAtTime(ambientVolume, audioCtx.currentTime, 0.1);
 }
 
-function selectAmbient(type, e) {
+function selectAmbient(type, el) {
     ambientType = type;
-    document.querySelectorAll('.ambient-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.ambient-btn').forEach(function(b){ b.classList.remove('active'); });
     document.getElementById('amb-' + type).classList.add('active');
     const volRow = document.getElementById('ambVolRow');
     volRow.classList.toggle('hidden', type === 'silence');
-    // if breathing is running, restart ambient
     if (isRunning) { stopAmbient(); if (type !== 'silence') startAmbient(); }
 }
 
@@ -1414,18 +1450,18 @@ function stopBreathing() {
 }
 
 // ==================== TABS ====================
-function switchTab(name, e) {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+function switchTab(name, el) {
+    document.querySelectorAll('.tab').forEach(function(t){ t.classList.remove('active'); });
+    document.querySelectorAll('.nav-btn').forEach(function(b){ b.classList.remove('active'); });
     document.getElementById('tab-' + name).classList.add('active');
-    if (e?.target) e.target.classList.add('active');
+    if (el) el.classList.add('active');
 }
 
 // ==================== MOOD ====================
-function selectMood(mood, e) {
+function selectMood(mood, el) {
     selectedMood = mood;
-    document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('selected'));
-    if (e?.target) e.target.classList.add('selected');
+    document.querySelectorAll('.mood-btn').forEach(function(b){ b.classList.remove('selected'); });
+    if (el && el.classList) el.classList.add('selected');
 }
 
 // ==================== THEME ====================
@@ -1535,16 +1571,117 @@ function setupDailyReminder() {
     else showToast('Non supporté');
 }
 
-// ==================== SERVICE WORKER ====================
-if ('serviceWorker' in navigator)
-    window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+// ==================== INIT & EVENT WIRING ====================
+// Appilix/Android WebView : touchstart est plus fiable que touchend ou click.
+// On désactive preventDefault uniquement sur les boutons (pas les sliders/inputs).
+function tap(el, fn) {
+    if (!el) return;
+    var touched = false;
+    el.addEventListener('touchstart', function(e) {
+        touched = true;
+        e.preventDefault(); // bloque le click fantôme 300ms
+        fn(e);
+    }, { passive: false });
+    el.addEventListener('click', function(e) {
+        if (touched) { touched = false; return; } // évite double-déclenchement
+        fn(e);
+    }, false);
+}
 
-// ==================== INIT ====================
-window.addEventListener('load', () => {
+// Débloque l'AudioContext au premier touch (obligatoire Android WebView)
+var audioUnlocked = false;
+function unlockAudio() {
+    if (audioUnlocked) return;
+    audioUnlocked = true;
+    try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        var buf = audioCtx.createBuffer(1, 1, 22050);
+        var src = audioCtx.createBufferSource();
+        src.buffer = buf; src.connect(audioCtx.destination); src.start(0);
+    } catch(e) {}
+}
+document.addEventListener('touchstart', unlockAudio, { passive: true });
+document.addEventListener('click', unlockAudio, { passive: true });
+
+// Attend que le DOM soit prêt (compatible Android WebView ancien)
+function domReady(fn) {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', fn);
+    } else {
+        fn();
+    }
+}
+
+domReady(function() {
     loadData();
     initSliders();
     updateValues();
     updateVolume();
+
+    // Theme button
+    tap(document.getElementById('themeBtn'), toggleTheme);
+
+    // Nav tabs
+    document.querySelectorAll('.nav-btn').forEach(function(btn) {
+        tap(btn, function() { switchTab(btn.getAttribute('data-tab'), btn); });
+    });
+
+    // Circle
+    tap(document.getElementById('circleOuter'), handleCircleClick);
+
+    // Start / Stop
+    tap(document.getElementById('startBtn'), startBreathing);
+    tap(document.getElementById('stopBtn'),  stopBreathing);
+
+    // Mood buttons
+    document.querySelectorAll('.mood-btn').forEach(function(btn) {
+        tap(btn, function() { selectMood(btn.getAttribute('data-mood'), btn); });
+    });
+
+    // Preset chips
+    document.querySelectorAll('.preset-chip').forEach(function(btn) {
+        tap(btn, function() { loadPreset(btn.getAttribute('data-preset'), btn); });
+    });
+
+    // Ambient buttons
+    document.querySelectorAll('.ambient-btn').forEach(function(btn) {
+        tap(btn, function() { selectAmbient(btn.getAttribute('data-ambient'), btn); });
+    });
+
+    // Volume sliders — input + change pour compatibilité max
+    ['volumeSlider', 'ambVolumeSlider'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('input',  id === 'volumeSlider' ? updateVolume : updateAmbVolume);
+        el.addEventListener('change', id === 'volumeSlider' ? updateVolume : updateAmbVolume);
+        el.addEventListener('touchmove', function(e) { e.stopPropagation(); }, { passive: true });
+    });
+
+    // Param sliders
+    ['inspireTime','holdInspireTime','expireTime','holdExpireTime','targetDuration'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('input',  function(){ updateValues(); });
+        el.addEventListener('change', function(){ updateValues(); });
+        el.addEventListener('touchmove', function(e) { e.stopPropagation(); }, { passive: true });
+    });
+
+    // Checkboxes — on utilise 'change' uniquement (natif, pas besoin de tap)
+    document.getElementById('largeTextToggle').addEventListener('change', toggleLargeText);
+    document.getElementById('darkModeToggle').addEventListener('change', toggleThemeFromSettings);
+    var reminderToggle = document.getElementById('dailyReminderToggle');
+    if (reminderToggle) reminderToggle.addEventListener('change', setupDailyReminder);
+
+    // Stats clear
+    tap(document.getElementById('clearStatsBtn'), clearStats);
+
+    // Export / Import
+    tap(document.getElementById('exportBtn'), exportData);
+    tap(document.getElementById('importBtn'), function() {
+        document.getElementById('fileInput').click();
+    });
+    document.getElementById('fileInput').addEventListener('change', importData);
 });
 </script>
 </body>
