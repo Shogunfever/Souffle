@@ -1,0 +1,1143 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Souffle</title>
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#0f1117">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Souffle">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg:        #0d0f14;
+            --bg2:       #13151c;
+            --surface:   rgba(255,255,255,0.04);
+            --surface2:  rgba(255,255,255,0.07);
+            --border:    rgba(255,255,255,0.08);
+            --text:      #e8e4dc;
+            --text-dim:  rgba(232,228,220,0.45);
+            --text-mid:  rgba(232,228,220,0.7);
+            --accent:    #8eb8a4;
+            --accent2:   #c4a882;
+            --danger:    #c0715a;
+            --glow:      rgba(142,184,164,0.15);
+            --font-serif: 'Cormorant Garamond', Georgia, serif;
+            --font-sans:  'DM Sans', system-ui, sans-serif;
+            --radius:     18px;
+            --radius-sm:  10px;
+        }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--font-sans);
+            font-weight: 300;
+            min-height: 100vh;
+            min-height: -webkit-fill-available;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            overflow-x: hidden;
+        }
+
+        /* Ambient background */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(ellipse 60% 50% at 50% -10%, rgba(142,184,164,0.07) 0%, transparent 70%),
+                radial-gradient(ellipse 40% 40% at 80% 80%, rgba(196,168,130,0.04) 0%, transparent 60%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .app {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 420px;
+            min-height: 100vh;
+            padding: 0 0 40px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ===== HEADER ===== */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 52px 28px 24px;
+        }
+        .header-title {
+            font-family: var(--font-serif);
+            font-size: 26px;
+            font-weight: 300;
+            letter-spacing: 0.04em;
+            color: var(--text);
+        }
+        .header-title span { color: var(--accent); }
+        .theme-btn {
+            width: 38px; height: 38px;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 15px;
+            transition: background 0.2s;
+            color: var(--text-mid);
+        }
+        .theme-btn:hover { background: var(--surface2); }
+
+        /* ===== TABS ===== */
+        .nav {
+            display: flex;
+            gap: 2px;
+            margin: 0 28px 32px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 3px;
+        }
+        .nav-btn {
+            flex: 1;
+            padding: 9px 0;
+            font-size: 12px;
+            font-family: var(--font-sans);
+            font-weight: 400;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            color: var(--text-dim);
+            background: transparent;
+            border: none;
+            border-radius: 9px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .nav-btn.active {
+            background: var(--surface2);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        .tab { display: none; padding: 0 28px; }
+        .tab.active { display: block; }
+
+        /* ===== CIRCLE ===== */
+        .circle-wrap {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 36px;
+        }
+
+        .circle-outer {
+            position: relative;
+            width: 220px;
+            height: 220px;
+            cursor: pointer;
+            margin-bottom: 24px;
+        }
+
+        /* Ripple rings */
+        .ripple {
+            position: absolute;
+            inset: -20px;
+            border-radius: 50%;
+            border: 1px solid rgba(142,184,164,0.12);
+            animation: ripple-idle 4s ease-in-out infinite;
+            pointer-events: none;
+        }
+        .ripple:nth-child(2) { inset: -36px; border-color: rgba(142,184,164,0.06); animation-delay: -1.3s; }
+        .ripple:nth-child(3) { inset: -52px; border-color: rgba(142,184,164,0.03); animation-delay: -2.6s; }
+
+        @keyframes ripple-idle {
+            0%, 100% { transform: scale(1); opacity: 0.6; }
+            50%       { transform: scale(1.04); opacity: 1; }
+        }
+
+        .circle {
+            position: absolute;
+            inset: 0;
+            border-radius: 50%;
+            background: radial-gradient(circle at 40% 35%, #1e2a24, #111518);
+            border: 1px solid rgba(142,184,164,0.18);
+            box-shadow:
+                0 0 40px rgba(142,184,164,0.08),
+                0 20px 60px rgba(0,0,0,0.5),
+                inset 0 1px 0 rgba(255,255,255,0.06);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            transition: box-shadow 0.5s ease;
+        }
+        .circle:hover {
+            box-shadow:
+                0 0 60px rgba(142,184,164,0.14),
+                0 20px 60px rgba(0,0,0,0.5),
+                inset 0 1px 0 rgba(255,255,255,0.08);
+        }
+
+        .circle.active-inspire {
+            animation: circle-expand var(--phase-dur, 5s) ease-in-out forwards;
+            box-shadow: 0 0 80px rgba(142,184,164,0.2), 0 20px 60px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06);
+        }
+        .circle.active-expire {
+            animation: circle-contract var(--phase-dur, 5s) ease-in-out forwards;
+        }
+        @keyframes circle-expand   { 0% { transform: scale(1); } 100% { transform: scale(1.22); } }
+        @keyframes circle-contract { 0% { transform: scale(1.22); } 100% { transform: scale(1); } }
+
+        .circle-phase {
+            font-family: var(--font-serif);
+            font-size: 19px;
+            font-weight: 300;
+            letter-spacing: 0.06em;
+            color: var(--text);
+        }
+        .circle-count {
+            font-size: 38px;
+            font-weight: 300;
+            color: var(--accent);
+            line-height: 1;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .session-info {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .session-time {
+            font-size: 13px;
+            color: var(--text-dim);
+            letter-spacing: 0.04em;
+        }
+        .session-time strong {
+            font-weight: 400;
+            color: var(--accent);
+        }
+
+        /* ===== ACTION BUTTONS ===== */
+        .actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 32px;
+        }
+        .btn {
+            padding: 14px;
+            font-family: var(--font-sans);
+            font-size: 13px;
+            font-weight: 400;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-start {
+            background: rgba(142,184,164,0.12);
+            color: var(--accent);
+            border-color: rgba(142,184,164,0.25);
+        }
+        .btn-start:hover:not(:disabled) {
+            background: rgba(142,184,164,0.2);
+        }
+        .btn-stop {
+            background: rgba(192,113,90,0.1);
+            color: var(--danger);
+            border-color: rgba(192,113,90,0.2);
+        }
+        .btn-stop:hover:not(:disabled) {
+            background: rgba(192,113,90,0.18);
+        }
+        .btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+        /* ===== MOOD ===== */
+        .section { margin-bottom: 28px; }
+        .section-label {
+            font-size: 10px;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--text-dim);
+            margin-bottom: 12px;
+        }
+
+        .mood-row {
+            display: flex;
+            gap: 8px;
+            justify-content: space-between;
+        }
+        .mood-btn {
+            flex: 1;
+            padding: 10px 0;
+            font-size: 20px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .mood-btn.selected {
+            background: var(--surface2);
+            border-color: var(--accent);
+            box-shadow: 0 0 12px var(--glow);
+        }
+
+        /* ===== SOUND ROW ===== */
+        .sound-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        .sound-label {
+            font-size: 12px;
+            color: var(--text-mid);
+            flex: 1;
+        }
+        .toggle {
+            position: relative;
+            width: 44px; height: 24px;
+            flex-shrink: 0;
+        }
+        .toggle input { opacity: 0; width: 0; height: 0; }
+        .toggle-track {
+            position: absolute;
+            inset: 0;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .toggle-thumb {
+            position: absolute;
+            top: 3px; left: 3px;
+            width: 16px; height: 16px;
+            background: var(--text-dim);
+            border-radius: 50%;
+            transition: all 0.2s;
+            pointer-events: none;
+        }
+        .toggle input:checked ~ .toggle-track { background: rgba(142,184,164,0.2); border-color: rgba(142,184,164,0.35); }
+        .toggle input:checked ~ .toggle-thumb { transform: translateX(20px); background: var(--accent); }
+
+        .vol-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+        .vol-icon { font-size: 13px; color: var(--text-dim); }
+        .vol-slider {
+            flex: 1;
+            -webkit-appearance: none;
+            height: 3px;
+            background: var(--surface2);
+            border-radius: 2px;
+            outline: none;
+        }
+        .vol-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px; height: 14px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+        }
+        .vol-val { font-size: 11px; color: var(--text-dim); width: 32px; text-align: right; }
+
+        /* ===== PRESETS ===== */
+        .presets-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 7px;
+            margin-bottom: 6px;
+        }
+        .preset-chip {
+            padding: 7px 14px;
+            font-size: 11px;
+            font-family: var(--font-sans);
+            font-weight: 400;
+            letter-spacing: 0.04em;
+            background: var(--surface);
+            color: var(--text-mid);
+            border: 1px solid var(--border);
+            border-radius: 30px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .preset-chip:hover { background: var(--surface2); color: var(--text); }
+        .preset-chip.active {
+            background: rgba(142,184,164,0.12);
+            border-color: rgba(142,184,164,0.35);
+            color: var(--accent);
+        }
+        .preset-chip.yogi {
+            background: rgba(196,168,130,0.06);
+            border-color: rgba(196,168,130,0.2);
+            color: var(--accent2);
+        }
+        .preset-chip.yogi.active {
+            background: rgba(196,168,130,0.15);
+            border-color: rgba(196,168,130,0.4);
+        }
+
+        /* ===== SLIDERS ===== */
+        .sliders { display: flex; flex-direction: column; gap: 18px; margin-top: 4px; }
+        .slider-row { display: grid; gap: 6px; }
+        .slider-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+        }
+        .slider-name { font-size: 12px; color: var(--text-mid); }
+        .slider-val  { font-size: 12px; color: var(--accent); font-variant-numeric: tabular-nums; }
+        input[type="range"].param-slider {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(to right, var(--accent) var(--pct, 0%), var(--surface2) var(--pct, 0%));
+            border-radius: 2px;
+            outline: none;
+            cursor: pointer;
+        }
+        input[type="range"].param-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px; height: 16px;
+            border-radius: 50%;
+            background: var(--accent);
+            box-shadow: 0 0 8px var(--glow);
+            cursor: pointer;
+        }
+        .target-slider input[type="range"].param-slider {
+            --accent: #c4a882;
+        }
+        .target-slider input[type="range"].param-slider::-webkit-slider-thumb {
+            background: var(--accent2);
+            box-shadow: 0 0 8px rgba(196,168,130,0.2);
+        }
+        .target-slider .slider-val { color: var(--accent2); }
+
+        /* ===== STATS ===== */
+        .stats-cards {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 28px;
+        }
+        .stat-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 18px 16px;
+        }
+        .stat-num {
+            font-family: var(--font-serif);
+            font-size: 36px;
+            font-weight: 300;
+            color: var(--accent);
+            line-height: 1;
+            margin-bottom: 4px;
+        }
+        .stat-lbl { font-size: 11px; color: var(--text-dim); letter-spacing: 0.05em; }
+
+        .history-title {
+            font-size: 10px;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--text-dim);
+            margin-bottom: 12px;
+        }
+        .history-list { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; }
+        .history-item {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 12px 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .history-date { font-size: 12px; color: var(--text-dim); }
+        .history-meta { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+        .history-dur  { font-size: 15px; font-weight: 400; color: var(--accent); }
+        .empty-state   { text-align: center; padding: 40px 0; font-size: 13px; color: var(--text-dim); }
+
+        .stats-clear-btn {
+            font-size: 11px; padding: 6px 14px;
+            background: rgba(192,113,90,0.1);
+            color: var(--danger);
+            border: 1px solid rgba(192,113,90,0.2);
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        /* ===== SETTINGS ===== */
+        .settings-group { margin-bottom: 28px; }
+        .settings-title {
+            font-size: 10px;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--text-dim);
+            margin-bottom: 14px;
+        }
+        .setting-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 16px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            margin-bottom: 8px;
+        }
+        .setting-name { font-size: 13px; color: var(--text-mid); }
+        .data-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .data-btn {
+            padding: 13px;
+            font-size: 12px;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            background: var(--surface);
+            color: var(--text-mid);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .data-btn:hover { background: var(--surface2); color: var(--text); }
+        .info-box {
+            margin-top: 28px;
+            padding: 16px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-size: 11px;
+            color: var(--text-dim);
+            line-height: 1.8;
+        }
+        .info-box strong { color: var(--text-mid); }
+
+        #fileInput { display: none; }
+
+        /* ===== TOAST ===== */
+        .toast {
+            position: fixed;
+            bottom: 32px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            background: #1e2a24;
+            border: 1px solid rgba(142,184,164,0.25);
+            color: var(--accent);
+            padding: 12px 22px;
+            border-radius: 30px;
+            font-size: 13px;
+            z-index: 1000;
+            opacity: 0;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+        .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+        /* ===== SCROLLBAR ===== */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 380px) {
+            .header { padding-top: 36px; }
+            .circle-outer { width: 190px; height: 190px; }
+            .circle-count { font-size: 32px; }
+        }
+    </style>
+</head>
+<body>
+<div class="toast" id="toast"></div>
+
+<div class="app">
+    <!-- Header -->
+    <div class="header">
+        <div class="header-title">Souffle<span>.</span></div>
+        <button class="theme-btn" id="themeBtn" onclick="toggleTheme()" title="Thème">🌙</button>
+    </div>
+
+    <!-- Nav -->
+    <div class="nav">
+        <button class="nav-btn active" onclick="switchTab('breathe', event)">Respirer</button>
+        <button class="nav-btn" onclick="switchTab('stats', event)">Statistiques</button>
+        <button class="nav-btn" onclick="switchTab('settings', event)">Réglages</button>
+    </div>
+
+    <!-- ===== TAB : BREATHE ===== -->
+    <div class="tab active" id="tab-breathe">
+
+        <!-- Circle -->
+        <div class="circle-wrap">
+            <div class="circle-outer" onclick="handleCircleClick()">
+                <div class="ripple"></div>
+                <div class="ripple"></div>
+                <div class="ripple"></div>
+                <div class="circle" id="circle">
+                    <div class="circle-phase" id="phaseText">Toucher</div>
+                    <div class="circle-count" id="timerDisplay">–</div>
+                </div>
+            </div>
+            <div class="session-info">
+                <div class="session-time">Session <strong id="sessionTimer">00:00</strong></div>
+            </div>
+        </div>
+
+        <!-- Boutons -->
+        <div class="actions">
+            <button class="btn btn-start" id="startBtn" onclick="startBreathing()">▶ Démarrer</button>
+            <button class="btn btn-stop"  id="stopBtn"  onclick="stopBreathing()" disabled>◼ Arrêter</button>
+        </div>
+
+        <!-- Humeur -->
+        <div class="section">
+            <div class="section-label">Humeur</div>
+            <div class="mood-row">
+                <button class="mood-btn" onclick="selectMood('😫', event)">😫</button>
+                <button class="mood-btn" onclick="selectMood('😟', event)">😟</button>
+                <button class="mood-btn" onclick="selectMood('😐', event)">😐</button>
+                <button class="mood-btn" onclick="selectMood('🙂', event)">🙂</button>
+                <button class="mood-btn" onclick="selectMood('😊', event)">😊</button>
+            </div>
+        </div>
+
+        <!-- Son & Vibrations -->
+        <div class="section">
+            <div class="section-label">Son & Retour</div>
+            <div class="sound-row">
+                <span class="sound-label">Son</span>
+                <label class="toggle">
+                    <input type="checkbox" id="soundToggle" checked>
+                    <div class="toggle-track"></div>
+                    <div class="toggle-thumb"></div>
+                </label>
+            </div>
+            <div class="vol-row">
+                <span class="vol-icon">🔈</span>
+                <input type="range" class="vol-slider" id="volumeSlider" min="0" max="100" value="50" oninput="updateVolume()">
+                <span class="vol-val" id="volumeValue">50%</span>
+            </div>
+            <div class="sound-row">
+                <span class="sound-label">Vibrations</span>
+                <label class="toggle">
+                    <input type="checkbox" id="vibrateToggle" checked>
+                    <div class="toggle-track"></div>
+                    <div class="toggle-thumb"></div>
+                </label>
+            </div>
+        </div>
+
+        <!-- Presets classiques -->
+        <div class="section">
+            <div class="section-label">Techniques classiques</div>
+            <div class="presets-grid">
+                <button class="preset-chip active" onclick="loadPreset('coherence', event)">Cohérence 5-5</button>
+                <button class="preset-chip" onclick="loadPreset('relax', event)">Relaxation 4-7-8</button>
+                <button class="preset-chip" onclick="loadPreset('box', event)">Boîte 4-4-4-4</button>
+                <button class="preset-chip" onclick="loadPreset('calm', event)">Calme 6-2-4</button>
+                <button class="preset-chip" onclick="loadPreset('energy', event)">Énergie 3-3</button>
+            </div>
+        </div>
+
+        <!-- Presets Yogi -->
+        <div class="section">
+            <div class="section-label">Techniques Yogi</div>
+            <div class="presets-grid">
+                <button class="preset-chip yogi" onclick="loadPreset('miniyogi', event)">Mini Yogi</button>
+                <button class="preset-chip yogi" onclick="loadPreset('megayogi', event)">Méga Yogi</button>
+                <button class="preset-chip yogi" onclick="loadPreset('megagigayogi', event)">Méga Giga Yogi</button>
+            </div>
+        </div>
+
+        <!-- Paramètres -->
+        <div class="section">
+            <div class="section-label">Paramètres du cycle</div>
+            <div class="sliders">
+                <div class="slider-row">
+                    <div class="slider-head">
+                        <span class="slider-name">Inspiration</span>
+                        <span class="slider-val" id="inspireValue">5s</span>
+                    </div>
+                    <input type="range" class="param-slider" id="inspireTime" min="1" max="60" value="5" oninput="updateValues(this)">
+                </div>
+                <div class="slider-row">
+                    <div class="slider-head">
+                        <span class="slider-name">Retenue inspiration</span>
+                        <span class="slider-val" id="holdInspireValue">0s</span>
+                    </div>
+                    <input type="range" class="param-slider" id="holdInspireTime" min="0" max="60" value="0" oninput="updateValues(this)">
+                </div>
+                <div class="slider-row">
+                    <div class="slider-head">
+                        <span class="slider-name">Expiration</span>
+                        <span class="slider-val" id="expireValue">5s</span>
+                    </div>
+                    <input type="range" class="param-slider" id="expireTime" min="1" max="60" value="5" oninput="updateValues(this)">
+                </div>
+                <div class="slider-row">
+                    <div class="slider-head">
+                        <span class="slider-name">Retenue expiration</span>
+                        <span class="slider-val" id="holdExpireValue">0s</span>
+                    </div>
+                    <input type="range" class="param-slider" id="holdExpireTime" min="0" max="60" value="0" oninput="updateValues(this)">
+                </div>
+                <div class="slider-row target-slider">
+                    <div class="slider-head">
+                        <span class="slider-name">Durée de session</span>
+                        <span class="slider-val" id="targetDurationValue">5 min</span>
+                    </div>
+                    <input type="range" class="param-slider" id="targetDuration" min="1" max="60" value="5" oninput="updateValues(this)">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== TAB : STATS ===== -->
+    <div class="tab" id="tab-stats">
+        <div class="stats-cards">
+            <div class="stat-card">
+                <div class="stat-num" id="totalSessions">0</div>
+                <div class="stat-lbl">Sessions</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-num" id="totalMinutes">0</div>
+                <div class="stat-lbl">Minutes totales</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-num" id="avgDuration">0</div>
+                <div class="stat-lbl">Moyenne (min)</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-num" id="currentStreak">0</div>
+                <div class="stat-lbl">Série de jours</div>
+            </div>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+            <div class="history-title" style="margin-bottom:0;">Historique</div>
+            <button class="stats-clear-btn" onclick="clearStats()">Effacer</button>
+        </div>
+        <div class="history-list" id="historyList">
+            <div class="empty-state">Aucune session enregistrée</div>
+        </div>
+    </div>
+
+    <!-- ===== TAB : SETTINGS ===== -->
+    <div class="tab" id="tab-settings">
+        <div class="settings-group">
+            <div class="settings-title">Affichage</div>
+            <div class="setting-row">
+                <span class="setting-name">Texte large</span>
+                <label class="toggle">
+                    <input type="checkbox" id="largeTextToggle" onchange="toggleLargeText()">
+                    <div class="toggle-track"></div>
+                    <div class="toggle-thumb"></div>
+                </label>
+            </div>
+            <div class="setting-row">
+                <span class="setting-name">Mode sombre</span>
+                <label class="toggle">
+                    <input type="checkbox" id="darkModeToggle" checked onchange="toggleThemeFromSettings()">
+                    <div class="toggle-track"></div>
+                    <div class="toggle-thumb"></div>
+                </label>
+            </div>
+        </div>
+
+        <div class="settings-group">
+            <div class="settings-title">Données</div>
+            <div class="data-grid">
+                <button class="data-btn" onclick="exportData()">Exporter</button>
+                <button class="data-btn" onclick="document.getElementById('fileInput').click()">Importer</button>
+            </div>
+            <input type="file" id="fileInput" accept=".json" onchange="importData(event)">
+        </div>
+
+        <div class="settings-group">
+            <div class="settings-title">Notifications</div>
+            <div class="setting-row">
+                <span class="setting-name">Rappel quotidien</span>
+                <label class="toggle">
+                    <input type="checkbox" id="dailyReminderToggle" onchange="setupDailyReminder()">
+                    <div class="toggle-track"></div>
+                    <div class="toggle-thumb"></div>
+                </label>
+            </div>
+        </div>
+
+        <div class="info-box">
+            <strong>Souffle Pro</strong> — Version 3.0<br>
+            Données stockées localement · Aucune connexion requise
+        </div>
+    </div>
+</div>
+
+<script>
+// ==================== STATE ====================
+let audioCtx = null;
+let isRunning = false;
+let timerInterval = null;
+let sessionStartTime = null;
+let sessionInterval = null;
+let targetDurationSec = 0;
+let selectedMood = null;
+let volume = 0.5;
+
+let stats = { sessions:[], totalSessions:0, totalMinutes:0, streak:0, lastSessionDate:null };
+
+// ==================== DATA ====================
+function loadData() {
+    try {
+        const s = localStorage.getItem('souffleData');
+        if (s) stats = JSON.parse(s);
+        if (localStorage.getItem('theme') === 'light') applyLight();
+        if (localStorage.getItem('largeText') === 'true') {
+            document.getElementById('largeTextToggle').checked = true;
+            document.body.style.fontSize = '1.15em';
+        }
+        if (localStorage.getItem('sound') === 'false') document.getElementById('soundToggle').checked = false;
+        if (localStorage.getItem('vibrate') === 'false') document.getElementById('vibrateToggle').checked = false;
+        updateStatsDisplay();
+    } catch(e) {}
+}
+function saveData() {
+    try { localStorage.setItem('souffleData', JSON.stringify(stats)); } catch(e) {}
+}
+
+// ==================== SLIDERS ====================
+function updateValues(el) {
+    const ids = ['inspireTime','holdInspireTime','expireTime','holdExpireTime','targetDuration'];
+    const labels = ['inspireValue','holdInspireValue','expireValue','holdExpireValue','targetDurationValue'];
+    const units  = ['s','s','s','s',' min'];
+    ids.forEach((id, i) => {
+        const input = document.getElementById(id);
+        const val = parseInt(input.value);
+        const max = parseInt(input.max);
+        const min = parseInt(input.min);
+        const pct = ((val - min) / (max - min)) * 100;
+        input.style.setProperty('--pct', pct + '%');
+        document.getElementById(labels[i]).textContent = val + units[i];
+    });
+}
+
+function initSliders() {
+    const ids = ['inspireTime','holdInspireTime','expireTime','holdExpireTime','targetDuration'];
+    ids.forEach(id => {
+        const input = document.getElementById(id);
+        const val = parseInt(input.value);
+        const max = parseInt(input.max);
+        const min = parseInt(input.min);
+        const pct = ((val - min) / (max - min)) * 100;
+        input.style.setProperty('--pct', pct + '%');
+    });
+}
+
+// ==================== PRESETS ====================
+function loadPreset(name, e) {
+    document.querySelectorAll('.preset-chip').forEach(b => b.classList.remove('active'));
+    if (e?.target) e.target.classList.add('active');
+    const P = {
+        coherence:    [5,  0,  5,  0],
+        relax:        [4,  0,  7,  8],
+        box:          [4,  4,  4,  4],
+        calm:         [6,  2,  4,  0],
+        energy:       [3,  0,  3,  0],
+        miniyogi:     [5,  0, 20,  0],
+        megayogi:     [5,  0, 25,  0],
+        megagigayogi: [5,  0, 30,  0]
+    };
+    const [ins, hIns, exp, hExp] = P[name];
+    document.getElementById('inspireTime').value     = ins;
+    document.getElementById('holdInspireTime').value = hIns;
+    document.getElementById('expireTime').value      = exp;
+    document.getElementById('holdExpireTime').value  = hExp;
+    updateValues();
+}
+
+// ==================== AUDIO ====================
+function initAudio() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+function updateVolume() {
+    volume = document.getElementById('volumeSlider').value / 100;
+    document.getElementById('volumeValue').textContent = document.getElementById('volumeSlider').value + '%';
+}
+function playTone(phase) {
+    if (!document.getElementById('soundToggle').checked) return;
+    initAudio();
+    const osc  = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain); gain.connect(audioCtx.destination);
+    const f = { inspire:432, hold_inspire:528, expire:384, hold_expire:336, finish:528 };
+    osc.frequency.value = f[phase] || 432;
+    osc.type = 'sine';
+    gain.gain.setValueAtTime(volume * 0.25, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.8);
+    osc.start(); osc.stop(audioCtx.currentTime + 0.8);
+}
+function doVibrate(p) {
+    if (document.getElementById('vibrateToggle').checked && navigator.vibrate) navigator.vibrate(p);
+}
+
+// ==================== BREATHING ====================
+const phaseNames = { inspire:'Inspiration', hold_inspire:'Retenue', expire:'Expiration', hold_expire:'Retenue' };
+
+function formatTime(s) {
+    return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+}
+
+function updateSessionTick() {
+    if (!sessionStartTime) return;
+    const e = Math.floor((Date.now() - sessionStartTime) / 1000);
+    document.getElementById('sessionTimer').textContent = formatTime(e);
+    if (targetDurationSec > 0 && e >= targetDurationSec) {
+        stopBreathing();
+        document.getElementById('phaseText').textContent  = 'Terminé';
+        document.getElementById('timerDisplay').textContent = '✓';
+        playTone('finish');
+        doVibrate([200,100,200]);
+        showToast('Session terminée ✓');
+        saveSessionStats();
+    }
+}
+
+function saveSessionStats() {
+    if (!sessionStartTime) return;
+    const mins = Math.round((Date.now() - sessionStartTime) / 60000);
+    const preset = document.querySelector('.preset-chip.active')?.textContent || 'Custom';
+    stats.sessions.push({ date: new Date().toISOString(), duration: mins, mood: selectedMood, preset });
+    stats.totalSessions++;
+    stats.totalMinutes += mins;
+    const today = new Date().toDateString();
+    if (stats.lastSessionDate !== today) {
+        const yest = new Date(Date.now() - 86400000).toDateString();
+        stats.streak = (stats.lastSessionDate === yest) ? stats.streak + 1 : 1;
+        stats.lastSessionDate = today;
+    }
+    saveData(); updateStatsDisplay();
+}
+
+async function breatheCycle() {
+    if (!isRunning) return;
+    await runPhase('inspire',      +document.getElementById('inspireTime').value);
+    if (!isRunning) return;
+    await runPhase('hold_inspire', +document.getElementById('holdInspireTime').value);
+    if (!isRunning) return;
+    await runPhase('expire',       +document.getElementById('expireTime').value);
+    if (!isRunning) return;
+    await runPhase('hold_expire',  +document.getElementById('holdExpireTime').value);
+    if (isRunning) breatheCycle();
+}
+
+async function runPhase(phase, dur) {
+    if (dur === 0) return;
+    const circle  = document.getElementById('circle');
+    const phaseEl = document.getElementById('phaseText');
+    const countEl = document.getElementById('timerDisplay');
+
+    circle.className = 'circle';
+    void circle.offsetWidth;
+    circle.style.setProperty('--phase-dur', dur + 's');
+    if (phase === 'inspire') circle.classList.add('active-inspire');
+    else if (phase === 'expire') circle.classList.add('active-expire');
+
+    phaseEl.textContent = phaseNames[phase];
+    playTone(phase);
+    doVibrate(30);
+
+    let r = dur;
+    countEl.textContent = r;
+    return new Promise(resolve => {
+        timerInterval = setInterval(() => {
+            r--;
+            countEl.textContent = r;
+            if (r <= 0) { clearInterval(timerInterval); resolve(); }
+        }, 1000);
+    });
+}
+
+function handleCircleClick() {
+    isRunning ? stopBreathing() : startBreathing();
+}
+
+function startBreathing() {
+    initAudio();
+    isRunning = true;
+    document.getElementById('startBtn').disabled = true;
+    document.getElementById('stopBtn').disabled  = false;
+    targetDurationSec = +document.getElementById('targetDuration').value * 60;
+    sessionStartTime  = Date.now();
+    sessionInterval   = setInterval(updateSessionTick, 1000);
+    breatheCycle();
+}
+
+function stopBreathing() {
+    isRunning = false;
+    clearInterval(timerInterval);
+    clearInterval(sessionInterval);
+    document.getElementById('startBtn').disabled = false;
+    document.getElementById('stopBtn').disabled  = true;
+    document.getElementById('phaseText').textContent  = 'Toucher';
+    document.getElementById('timerDisplay').textContent = '–';
+    document.getElementById('sessionTimer').textContent = '00:00';
+    const c = document.getElementById('circle');
+    c.className = 'circle';
+    c.style.removeProperty('--phase-dur');
+    sessionStartTime = null;
+}
+
+// ==================== TABS ====================
+function switchTab(name, e) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + name).classList.add('active');
+    if (e?.target) e.target.classList.add('active');
+}
+
+// ==================== MOOD ====================
+function selectMood(mood, e) {
+    selectedMood = mood;
+    document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('selected'));
+    if (e?.target) e.target.classList.add('selected');
+}
+
+// ==================== THEME ====================
+function applyLight() {
+    document.documentElement.style.setProperty('--bg',       '#f0ede8');
+    document.documentElement.style.setProperty('--bg2',      '#e8e4de');
+    document.documentElement.style.setProperty('--surface',  'rgba(0,0,0,0.04)');
+    document.documentElement.style.setProperty('--surface2', 'rgba(0,0,0,0.07)');
+    document.documentElement.style.setProperty('--border',   'rgba(0,0,0,0.1)');
+    document.documentElement.style.setProperty('--text',     '#2c2820');
+    document.documentElement.style.setProperty('--text-dim', 'rgba(44,40,32,0.45)');
+    document.documentElement.style.setProperty('--text-mid', 'rgba(44,40,32,0.7)');
+    document.getElementById('themeBtn').textContent = '☀️';
+    document.getElementById('darkModeToggle').checked = false;
+}
+function applyDark() {
+    document.documentElement.style.removeProperty('--bg');
+    document.documentElement.style.removeProperty('--bg2');
+    document.documentElement.style.removeProperty('--surface');
+    document.documentElement.style.removeProperty('--surface2');
+    document.documentElement.style.removeProperty('--border');
+    document.documentElement.style.removeProperty('--text');
+    document.documentElement.style.removeProperty('--text-dim');
+    document.documentElement.style.removeProperty('--text-mid');
+    document.getElementById('themeBtn').textContent = '🌙';
+    document.getElementById('darkModeToggle').checked = true;
+}
+function toggleTheme() {
+    const light = localStorage.getItem('theme') === 'light';
+    if (light) { applyDark(); localStorage.setItem('theme','dark'); }
+    else        { applyLight(); localStorage.setItem('theme','light'); }
+}
+function toggleThemeFromSettings() {
+    if (document.getElementById('darkModeToggle').checked) { applyDark(); localStorage.setItem('theme','dark'); }
+    else { applyLight(); localStorage.setItem('theme','light'); }
+}
+
+// ==================== ACCESSIBILITY ====================
+function toggleLargeText() {
+    const on = document.getElementById('largeTextToggle').checked;
+    document.body.style.fontSize = on ? '1.15em' : '';
+    localStorage.setItem('largeText', on);
+}
+
+// ==================== TOAST ====================
+function showToast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ==================== STATS ====================
+function updateStatsDisplay() {
+    document.getElementById('totalSessions').textContent = stats.totalSessions;
+    document.getElementById('totalMinutes').textContent  = stats.totalMinutes;
+    document.getElementById('avgDuration').textContent   = stats.totalSessions ? Math.round(stats.totalMinutes/stats.totalSessions) : 0;
+    document.getElementById('currentStreak').textContent = stats.streak;
+    const list = document.getElementById('historyList');
+    if (!stats.sessions.length) {
+        list.innerHTML = '<div class="empty-state">Aucune session enregistrée</div>';
+        return;
+    }
+    list.innerHTML = stats.sessions.slice(-10).reverse().map(s => {
+        const d = new Date(s.date).toLocaleDateString('fr-FR', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+        return `<div class="history-item">
+            <div>
+                <div class="history-date">${d}</div>
+                <div class="history-meta">${s.mood || '—'} · ${s.preset || ''}</div>
+            </div>
+            <div class="history-dur">${s.duration} min</div>
+        </div>`;
+    }).join('');
+}
+function clearStats() {
+    if (!confirm('Effacer toutes les statistiques ?')) return;
+    stats = { sessions:[], totalSessions:0, totalMinutes:0, streak:0, lastSessionDate:null };
+    saveData(); updateStatsDisplay();
+    showToast('Statistiques effacées');
+}
+
+// ==================== EXPORT / IMPORT ====================
+function exportData() {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(stats,null,2)], {type:'application/json'}));
+    a.download = `souffle-${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    showToast('Données exportées');
+}
+function importData(e) {
+    const file = e.target.files[0]; if (!file) return;
+    const r = new FileReader();
+    r.onload = ev => {
+        try {
+            const d = JSON.parse(ev.target.result);
+            if (d.sessions) { stats = d; saveData(); updateStatsDisplay(); showToast('Données importées'); }
+            else alert('Format invalide');
+        } catch { alert("Erreur d'importation"); }
+    };
+    r.readAsText(file);
+}
+
+// ==================== REMINDER ====================
+function setupDailyReminder() {
+    if ('Notification' in window)
+        Notification.requestPermission().then(p => showToast(p === 'granted' ? 'Rappel activé' : 'Permission refusée'));
+    else showToast('Non supporté');
+}
+
+// ==================== SERVICE WORKER ====================
+if ('serviceWorker' in navigator)
+    window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+
+// ==================== INIT ====================
+window.addEventListener('load', () => {
+    loadData();
+    initSliders();
+    updateValues();
+    updateVolume();
+});
+</script>
+</body>
+</html>
