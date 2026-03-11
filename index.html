@@ -1572,16 +1572,15 @@ function setupDailyReminder() {
 // tap() : touchstart + click fallback, anti-doublon
 function tap(el, fn) {
     if (!el) return;
-    var touched = false;
-    el.addEventListener('touchstart', function(e) {
-        touched = true;
-        e.preventDefault();
-        fn(e);
-    }, { passive: false });
-    el.addEventListener('click', function(e) {
-        if (touched) { touched = false; return; }
-        fn(e);
-    }, false);
+    var lastFire = 0;
+    function fire() {
+        var now = Date.now();
+        if (now - lastFire < 500) return;
+        lastFire = now;
+        fn();
+    }
+    el.addEventListener('touchend', fire, { passive: true });
+    el.addEventListener('click',    fire, false);
 }
 
 function unlockAudio() {
