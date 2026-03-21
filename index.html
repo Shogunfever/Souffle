@@ -35,6 +35,7 @@ input[type="range"]{touch-action:pan-x;}
   --r:16px;
   --r-sm:10px;
   --nav-h:64px;
+  --nav-bg:rgba(13,15,20,0.96);
 }
 
 body{
@@ -111,7 +112,7 @@ body::before{
   width:100%;
   max-width:480px;
   height:var(--nav-h);
-  background:rgba(13,15,20,0.95);
+  background:var(--nav-bg);
   border-top:1px solid var(--border);
   display:-webkit-flex;display:flex;
   z-index:100;
@@ -1714,11 +1715,12 @@ function applyLight() {
     r.setProperty('--border','rgba(0,0,0,0.09)'); r.setProperty('--border2','rgba(0,0,0,0.15)');
     r.setProperty('--text','#2c2820'); r.setProperty('--text-dim','rgba(44,40,32,0.45)');
     r.setProperty('--text-mid','rgba(44,40,32,0.68)');
+    r.setProperty('--nav-bg','rgba(240,237,232,0.97)');
     document.getElementById('themeBtn').textContent = '☀️';
 }
 function applyDark() {
     var r = document.documentElement.style;
-    ['--bg','--bg2','--surface','--surface2','--border','--border2','--text','--text-dim','--text-mid'].forEach(function(p){ r.removeProperty(p); });
+    ['--bg','--bg2','--surface','--surface2','--border','--border2','--text','--text-dim','--text-mid','--nav-bg'].forEach(function(p){ r.removeProperty(p); });
     document.getElementById('themeBtn').textContent = '🌙';
 }
 function toggleTheme() {
